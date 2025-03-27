@@ -4,8 +4,8 @@ FROM wordpress:latest
 # Run as root for package installation
 USER root
 
-# Install necessary packages
-RUN apt-get update && apt-get install -y wget unzip
+# Install necessary packages including default-mysql-client for mysqlcheck
+RUN apt-get update && apt-get install -y wget unzip default-mysql-client
 
 # Install WP‑CLI
 RUN wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /usr/local/bin/wp && \
@@ -21,5 +21,5 @@ RUN mkdir -p /usr/src/wordpress/wp-content/plugins && \
 COPY setup.sh /usr/local/bin/setup.sh
 RUN chmod +x /usr/local/bin/setup.sh
 
-# Switch to non‑root user for running WordPress commands
+# Switch to non‑root user provided by the official WordPress image
 USER www-data

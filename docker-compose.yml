@@ -32,20 +32,22 @@ services:
     restart: always
 
   wp-setup:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: mywordpress:latest
     depends_on:
       - wordpress
+    environment:
+      WP_SITE_URL: "http://localhost:8000"
+      WP_SITE_TITLE: "My WordPress Site"
+      WP_ADMIN_USER: admin
+      WP_ADMIN_PASSWORD: admin_password
+      WP_ADMIN_EMAIL: admin@example.com
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
     volumes:
       - wp_data:/var/www/html
-    entrypoint: >
-      /bin/bash -c "echo 'Waiting for WordPress installation...';
-      until wp core is-installed --path=/var/www/html; do sleep 5; done;
-      echo 'Activating BuddyPress plugin...';
-      wp plugin activate buddypress --path=/var/www/html;
-      echo 'BuddyPress activated. Exiting.'"
+    entrypoint: ["/usr/local/bin/setup.sh"]
     restart: "no"
 
 volumes:
