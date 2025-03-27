@@ -1,0 +1,26 @@
+# .dockerignore
+
+# Exclude Git repository data
+.git
+.gitignore
+
+# Exclude Node.js dependencies (if applicable)
+node_modules
+
+# Exclude temporary files and directories
+tmp
+*.log
+
+# Exclude environment configuration files containing sensitive information
+.env
+.env.local
+
+# Exclude OS-specific files
+.DS_Store
+Thumbs.db
+
+# Optional: Exclude Composer dependencies if you plan to install them during the build process
+vendor
+
+# Optional: Exclude build caches or other artifacts
+cache
