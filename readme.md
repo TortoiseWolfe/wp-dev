@@ -81,6 +81,23 @@ Example:
 docker-compose exec wordpress wp --allow-root plugin list
 ```
 
+### Populating Demo Content
+
+To add example users, posts, comments, pages, and BuddyPress content:
+
+```bash
+docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh
+```
+
+**Important Note**: The script must be run from inside the container using the path above. It will not work if you try to run it directly from your host machine.
+
+This will create:
+- 20 example users with Latin names
+- 20 sample posts with comments and replies
+- 5 BuddyPress groups with members and activities (if BuddyPress is active)
+- 5 sample pages with philosophical content
+- Example messages to admin (if BuddyPress Messages is active)
+
 ## Git Workflow
 
 ### Branching Strategy

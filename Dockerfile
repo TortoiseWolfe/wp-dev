@@ -17,9 +17,19 @@ RUN mkdir -p /usr/src/wordpress/wp-content/plugins && \
     unzip buddypress.zip -d /usr/src/wordpress/wp-content/plugins && \
     rm buddypress.zip
 
+# Download and extract BuddyX theme into the source themes directory
+RUN mkdir -p /usr/src/wordpress/wp-content/themes && \
+    wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
+    unzip buddyx.zip -d /usr/src/wordpress/wp-content/themes && \
+    rm buddyx.zip
+
 # Copy the automated setup script into the image
 COPY setup.sh /usr/local/bin/setup.sh
 RUN chmod +x /usr/local/bin/setup.sh
+
+# Copy the devscripts directory
+COPY devscripts /usr/local/bin/devscripts
+RUN chmod +x /usr/local/bin/devscripts/demo-content.sh
 
 # Switch to non‑root user provided by the official WordPress image
 USER www-data

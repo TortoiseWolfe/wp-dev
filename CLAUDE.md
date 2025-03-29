@@ -5,6 +5,8 @@
 - `docker-compose down`: Stop WordPress environment
 - `docker-compose exec wordpress wp --allow-root [command]`: Run WP-CLI commands
 - `docker-compose exec wordpress bash`: Access WordPress container shell
+- `docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh`: Populate site with demo content
+- `docker-compose exec wordpress /usr/local/bin/devscripts/demo-cleanup.sh`: Clean up demo content
 
 ## Testing
 - No specific testing framework implemented
