@@ -15,6 +15,18 @@ if ! wp plugin is-active buddypress --path=/var/www/html; then
     exit 1
 fi
 
+# Set permalink structure EARLY for better URLs
+echo "Setting permalink structure..."
+# Just use the simplest method possible
+wp option update permalink_structure '/%postname%/' --path=/var/www/html
+wp rewrite flush --path=/var/www/html
+# Check permalink structure
+echo "Verifying permalink structure..."
+wp option get permalink_structure --path=/var/www/html
+
+# Make sure we have a useful message for the user
+echo "NOTE: While tutorial content is created using markdown format, the links in the curriculum page will work correctly with pretty URLs."
+
 # Make sure components are all initialized
 echo "Checking BuddyPress components..."
 wp bp component list --path=/var/www/html || true
@@ -51,8 +63,40 @@ for i in {1..20}; do
     fi
 done
 
+echo "Setting up post categories..."
+# Categories for posts
+categories=(
+    "Philosophy" 
+    "Literature"
+    "History"
+    "Classical Studies"
+    "Roman Culture"
+)
+
+# Create categories if they don't exist and store their IDs
+category_ids=()
+for category in "${categories[@]}"; do
+    # Generate a proper slug from the category name
+    slug=$(echo "$category" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+    
+    # Check if category exists
+    existing_cat_id=$(wp term list category --name="$category" --field=term_id --path=/var/www/html)
+    
+    if [ -n "$existing_cat_id" ]; then
+        # Use existing category
+        cat_id=$existing_cat_id
+        echo "Using existing category: $category with ID: $cat_id"
+    else
+        # Create new category
+        cat_id=$(wp term create category "$category" --slug="$slug" --porcelain --path=/var/www/html)
+        echo "Created category: $category with ID: $cat_id and slug: $slug"
+    fi
+    
+    category_ids+=("$cat_id")
+done
+
 echo "Creating example posts..."
-# Create 20 example posts randomly assigned to different users
+# Create 20 example posts randomly assigned to different users and categories
 for i in {1..20}; do
     # Get random user ID between 2-11 (skipping admin which is usually ID 1)
     user_id=$((RANDOM % 10 + 2))
@@ -111,8 +155,17 @@ for i in {1..20}; do
         content+="${lorem_paragraphs[$para_index]}\n\n"
     done
     
-    post_id=$(wp post create --post_title="$title" --post_content="$content" --post_status="publish" --post_author="$user_id" --porcelain --path=/var/www/html)
-    echo "Created post ID: $post_id by user ID: $user_id"
+    # Assign a random category to the post
+    rand_category_index=$((RANDOM % ${#category_ids[@]}))
+    category_id=${category_ids[$rand_category_index]}
+    
+    # Create the post with the category directly to avoid "Uncategorized" being added
+    post_id=$(wp post create --post_title="$title" --post_content="$content" --post_status="publish" --post_author="$user_id" --post_category="$category_id" --porcelain --path=/var/www/html)
+    
+    # Remove Uncategorized category if still assigned
+    wp post term remove "$post_id" category 1 --path=/var/www/html || true
+    
+    echo "Created post ID: $post_id by user ID: $user_id in category: ${categories[$rand_category_index]}"
     
     # Add between 1-5 comments to each post
     comment_count=$((RANDOM % 5 + 1))
@@ -178,114 +231,6 @@ for i in {1..20}; do
         fi
     done
 done
-
-# If BuddyPress is active, create some BuddyPress content
-if wp plugin is-active buddypress --path=/var/www/html && wp bp component list --path=/var/www/html | grep -q 'groups.*true'; then
-    echo "Creating BuddyPress groups and activities..."
-    
-    # Create 5 BuddyPress groups
-    for i in {1..5}; do
-        creator_id=$((RANDOM % 10 + 2))
-        if ! wp user get $creator_id --path=/var/www/html &>/dev/null; then
-            creator_id=1
-        fi
-        
-        # Array of philosophical group names and descriptions
-        group_names=(
-            "The Stoic Circle" 
-            "Peripatetic Society" 
-            "Epicurean Garden" 
-            "Platonic Academy" 
-            "Cynics Anonymous"
-        )
-        
-        group_descriptions=(
-            "A gathering place for those who follow the Stoic philosophy of Zeno, Seneca, and Marcus Aurelius. Here we discuss virtue, rationality, and living in accordance with nature."
-            "Named after Aristotle's habit of walking while teaching, our society explores metaphysics, ethics, politics, and the golden mean. All those seeking knowledge are welcome."
-            "Following Epicurus, we believe in the pursuit of modest pleasures and the absence of pain and fear. Join us to explore tranquility and the simple joys of life."
-            "Dedicated to the dialogues and teachings of Plato, exploring forms, ideas, and the pursuit of wisdom. Socratic discussions every Thursday."
-            "Rejecting social conventions and embracing a simple life in accordance with nature. All materialists will be mercilessly mocked."
-        )
-        
-        group_name="${group_names[$i-1]}"
-        group_desc="${group_descriptions[$i-1]}"
-        
-        # Create group
-        group_id=$(wp bp group create --name="$group_name" --description="$group_desc" --creator-id="$creator_id" --path=/var/www/html --porcelain)
-        
-        # Add random members to group
-        for j in {1..8}; do
-            member_id=$((RANDOM % 10 + 2))
-            if wp user get $member_id --path=/var/www/html &>/dev/null; then
-                wp bp group member add --group-id="$group_id" --user-id="$member_id" --path=/var/www/html || true
-            fi
-        done
-        
-        # Create some activity updates
-        for k in {1..3}; do
-            activity_author=$((RANDOM % 10 + 2))
-            if ! wp user get $activity_author --path=/var/www/html &>/dev/null; then
-                activity_author=1
-            fi
-            
-            # Array of philosophical activity updates for each group type
-            stoic_activities=(
-                "Just finished reading Seneca's 'Letters from a Stoic'. Who else has insights to share on his views of friendship?"
-                "Practicing negative visualization today. Imagining the loss of what I value to appreciate it more fully."
-                "Marcus Aurelius reminds us: 'You have power over your mind - not outside events. Realize this, and you will find strength.'"
-                "Question for the group: How do you practice Stoic mindfulness in your daily life?"
-                "Remember that we cannot control external events, only our responses to them. How is everyone applying this today?"
-            )
-            
-            peripatetic_activities=(
-                "Contemplating Aristotle's concept of eudaimonia today. Is happiness truly activity of the soul in accordance with virtue?"
-                "Walking discussions - literally peripatetic! Anyone want to join this Saturday for philosophy in motion?"
-                "Reading Aristotle's 'Nicomachean Ethics'. His concept of the golden mean seems particularly relevant in today's polarized world."
-                "Virtue as a mean between extremes - how does this apply to courage in modern life? Thoughts?"
-                "Exploring the categorical syllogism as a method of deductive reasoning. Examples welcome!"
-            )
-            
-            epicurean_activities=(
-                "Simple dinner gathering this Friday - good food, good conversation, good friends. The essence of Epicurean living."
-                "Reminder: true pleasure isn't excessive indulgence, but freedom from pain and mental disturbance."
-                "Finding ataraxia (tranquility) through simplifying life choices. What have you eliminated that brought peace?"
-                "Natural and necessary desires vs vain desires - how do you distinguish between them in your life?"
-                "Reading group for Lucretius' 'On the Nature of Things' starts next week. Sign up now!"
-            )
-            
-            platonic_activities=(
-                "Debating the allegory of the cave - how do we recognize the shadows on our own walls?"
-                "Reading group forming for Plato's Republic, Books VI-VII. Focus on the theory of Forms."
-                "Theory of recollection: Do we really know nothing, or simply forget what our souls once knew?"
-                "Wisdom, courage, moderation, justice - the four cardinal virtues. Which do you find most challenging to embody?"
-                "Dialectic practice session this Thursday. Bring your strongest arguments to be systematically examined!"
-            )
-            
-            cynic_activities=(
-                "Diogenes lived in a barrel to demonstrate self-sufficiency. What's your modern equivalent of barrel-living?"
-                "Conventional wisdom challenged: Why do we work so hard for things we don't need to impress people we don't like?"
-                "Walking barefoot meditation tomorrow at dawn. Clothing optional, shamelessness mandatory."
-                "Remember: A dog has no use for fancy furnishings or social status. Be more dog-like!"
-                "Challenge of the week: Identify one social convention you follow without question, then deliberately break it."
-            )
-            
-            # Select appropriate activity based on group type
-            case $i in
-                1) activities=("${stoic_activities[@]}") ;;
-                2) activities=("${peripatetic_activities[@]}") ;;
-                3) activities=("${epicurean_activities[@]}") ;;
-                4) activities=("${platonic_activities[@]}") ;;
-                5) activities=("${cynic_activities[@]}") ;;
-                *) activities=("${stoic_activities[@]}") ;;
-            esac
-            
-            activity_index=$((RANDOM % ${#activities[@]}))
-            activity_content="${activities[$activity_index]}"
-            
-            wp bp activity create --component=groups --type=activity_update --user-id="$activity_author" --content="$activity_content" --item-id="$group_id" --path=/var/www/html
-        done
-    done
-fi
 
 echo "Creating sample pages..."
 # Create philosophical pages
@@ -491,1167 +436,979 @@ else
     fi
 fi
 
-# region: TUTORIAL CONTENT
-echo "Creating BuddyPress & BuddyX tutorial curriculum..."
-
-# Check if BuddyPress is active and installed
-if ! wp plugin is-active buddypress --path=/var/www/html; then
-    echo "BuddyPress is not active. Attempting to activate..."
-    if wp plugin activate buddypress --path=/var/www/html; then
-        echo "BuddyPress activated successfully."
-    else
-        echo "BuddyPress activation failed. Skipping tutorial content creation."
-        return 1
-    fi
+# If BuddyPress is active, create groups
+if wp plugin is-active buddypress --path=/var/www/html && wp bp component list --path=/var/www/html | grep -q 'groups.*true'; then
+    echo "Creating BuddyPress groups and activities..."
+    
+    # Create 5 BuddyPress groups
+    for i in {1..5}; do
+        creator_id=$((RANDOM % 10 + 2))
+        if ! wp user get $creator_id --path=/var/www/html &>/dev/null; then
+            creator_id=1
+        fi
+        
+        # Array of philosophical group names and descriptions
+        group_names=(
+            "The Stoic Circle" 
+            "Peripatetic Society" 
+            "Epicurean Garden" 
+            "Platonic Academy" 
+            "Cynics Anonymous"
+        )
+        
+        group_descriptions=(
+            "A gathering place for those who follow the Stoic philosophy of Zeno, Seneca, and Marcus Aurelius. Here we discuss virtue, rationality, and living in accordance with nature."
+            "Named after Aristotle's habit of walking while teaching, our society explores metaphysics, ethics, politics, and the golden mean. All those seeking knowledge are welcome."
+            "Following Epicurus, we believe in the pursuit of modest pleasures and the absence of pain and fear. Join us to explore tranquility and the simple joys of life."
+            "Dedicated to the dialogues and teachings of Plato, exploring forms, ideas, and the pursuit of wisdom. Socratic discussions every Thursday."
+            "Rejecting social conventions and embracing a simple life in accordance with nature. All materialists will be mercilessly mocked."
+        )
+        
+        group_name="${group_names[$i-1]}"
+        group_desc="${group_descriptions[$i-1]}"
+        
+        # Create group
+        group_id=$(wp bp group create --name="$group_name" --description="$group_desc" --creator-id="$creator_id" --path=/var/www/html --porcelain)
+        
+        # Add random members to group
+        for j in {1..8}; do
+            member_id=$((RANDOM % 10 + 2))
+            if wp user get $member_id --path=/var/www/html &>/dev/null; then
+                wp bp group member add --group-id="$group_id" --user-id="$member_id" --path=/var/www/html || true
+            fi
+        done
+        
+        # Create some activity updates
+        for k in {1..3}; do
+            activity_author=$((RANDOM % 10 + 2))
+            if ! wp user get $activity_author --path=/var/www/html &>/dev/null; then
+                activity_author=1
+            fi
+            
+            # Array of philosophical activity updates for each group type
+            stoic_activities=(
+                "Just finished reading Seneca's 'Letters from a Stoic'. Who else has insights to share on his views of friendship?"
+                "Practicing negative visualization today. Imagining the loss of what I value to appreciate it more fully."
+                "Marcus Aurelius reminds us: 'You have power over your mind - not outside events. Realize this, and you will find strength.'"
+                "Question for the group: How do you practice Stoic mindfulness in your daily life?"
+                "Remember that we cannot control external events, only our responses to them. How is everyone applying this today?"
+            )
+            
+            peripatetic_activities=(
+                "Contemplating Aristotle's concept of eudaimonia today. Is happiness truly activity of the soul in accordance with virtue?"
+                "Walking discussions - literally peripatetic! Anyone want to join this Saturday for philosophy in motion?"
+                "Reading Aristotle's 'Nicomachean Ethics'. His concept of the golden mean seems particularly relevant in today's polarized world."
+                "Virtue as a mean between extremes - how does this apply to courage in modern life? Thoughts?"
+                "Exploring the categorical syllogism as a method of deductive reasoning. Examples welcome!"
+            )
+            
+            epicurean_activities=(
+                "Simple dinner gathering this Friday - good food, good conversation, good friends. The essence of Epicurean living."
+                "Reminder: true pleasure isn't excessive indulgence, but freedom from pain and mental disturbance."
+                "Finding ataraxia (tranquility) through simplifying life choices. What have you eliminated that brought peace?"
+                "Natural and necessary desires vs vain desires - how do you distinguish between them in your life?"
+                "Reading group for Lucretius' 'On the Nature of Things' starts next week. Sign up now!"
+            )
+            
+            platonic_activities=(
+                "Debating the allegory of the cave - how do we recognize the shadows on our own walls?"
+                "Reading group forming for Plato's Republic, Books VI-VII. Focus on the theory of Forms."
+                "Theory of recollection: Do we really know nothing, or simply forget what our souls once knew?"
+                "Wisdom, courage, moderation, justice - the four cardinal virtues. Which do you find most challenging to embody?"
+                "Dialectic practice session this Thursday. Bring your strongest arguments to be systematically examined!"
+            )
+            
+            cynic_activities=(
+                "Diogenes lived in a barrel to demonstrate self-sufficiency. What's your modern equivalent of barrel-living?"
+                "Conventional wisdom challenged: Why do we work so hard for things we don't need to impress people we don't like?"
+                "Walking barefoot meditation tomorrow at dawn. Clothing optional, shamelessness mandatory."
+                "Remember: A dog has no use for fancy furnishings or social status. Be more dog-like!"
+                "Challenge of the week: Identify one social convention you follow without question, then deliberately break it."
+            )
+            
+            # Select appropriate activity based on group type
+            case $i in
+                1) activities=("${stoic_activities[@]}") ;;
+                2) activities=("${peripatetic_activities[@]}") ;;
+                3) activities=("${epicurean_activities[@]}") ;;
+                4) activities=("${platonic_activities[@]}") ;;
+                5) activities=("${cynic_activities[@]}") ;;
+                *) activities=("${stoic_activities[@]}") ;;
+            esac
+            
+            activity_index=$((RANDOM % ${#activities[@]}))
+            activity_content="${activities[$activity_index]}"
+            
+            wp bp activity create --component=groups --type=activity_update --user-id="$activity_author" --content="$activity_content" --item-id="$group_id" --path=/var/www/html
+        done
+    done
 fi
 
-# Proceed with creating tutorial content
-    # Create main tutorial category
-    tutorial_cat_id=$(wp term create category "BuddyPress Tutorials" --porcelain --path=/var/www/html)
-    
-    # Create subcategories for different tutorial types
-    basics_cat_id=$(wp term create category "Getting Started" --parent=$tutorial_cat_id --porcelain --path=/var/www/html)
-    groups_cat_id=$(wp term create category "Managing Groups" --parent=$tutorial_cat_id --porcelain --path=/var/www/html)
-    members_cat_id=$(wp term create category "Member Management" --parent=$tutorial_cat_id --porcelain --path=/var/www/html)
-    activity_cat_id=$(wp term create category "Activity Streams" --parent=$tutorial_cat_id --porcelain --path=/var/www/html)
-    buddyx_cat_id=$(wp term create category "BuddyX Theme" --parent=$tutorial_cat_id --porcelain --path=/var/www/html)
-    
-    # Array of tutorial posts organized by category
-    # Format: "Title|Content|Category ID|Order Number"
-    
-    # Getting Started Tutorials
-    basics_tutorials=(
-        "Introduction to BuddyPress|<h2>Welcome to BuddyPress!</h2>
-<p>BuddyPress transforms your WordPress site into a vibrant social network. This tutorial series will help you understand how to use BuddyPress to build a thriving online community.</p>
+# region: TUTORIAL CONTENT CREATION
+echo "Creating tutorial content for BuddyPress and BuddyX..."
+
+# Permalinks already set at beginning of script
+
+# Create main tutorial category and subcategories first so we have the IDs
+echo "Creating tutorial categories..."
+main_cat_id=$(wp term create category "BuddyPress Tutorials" --slug="buddypress-tutorials" --porcelain --path=/var/www/html)
+echo "Created main tutorial category with ID: $main_cat_id"
+
+# Create subcategories
+getting_started_id=$(wp term create category "Getting Started" --slug="getting-started" --parent=$main_cat_id --porcelain --path=/var/www/html)
+echo "Created 'Getting Started' subcategory with ID: $getting_started_id"
+
+group_management_id=$(wp term create category "Group Management" --slug="group-management" --parent=$main_cat_id --porcelain --path=/var/www/html)
+echo "Created 'Group Management' subcategory with ID: $group_management_id"
+
+member_management_id=$(wp term create category "Member Management" --slug="member-management" --parent=$main_cat_id --porcelain --path=/var/www/html)
+echo "Created 'Member Management' subcategory with ID: $member_management_id"
+
+activity_streams_id=$(wp term create category "Activity Streams" --slug="activity-streams" --parent=$main_cat_id --porcelain --path=/var/www/html)
+echo "Created 'Activity Streams' subcategory with ID: $activity_streams_id"
+
+buddyx_theme_id=$(wp term create category "BuddyX Theme" --slug="buddyx-theme" --parent=$main_cat_id --porcelain --path=/var/www/html)
+echo "Created 'BuddyX Theme' subcategory with ID: $buddyx_theme_id"
+
+# Create tutorial posts
+echo "Creating tutorial posts..."
+
+# Getting Started tutorials
+intro_bp_id=$(wp post create --post_title="Introduction to BuddyPress" --post_name="introduction-to-buddypress" --post_author="1" --post_content="<h2>Introduction to BuddyPress</h2>
+
+<p>BuddyPress is a powerful plugin that transforms your WordPress site into a full-featured social network. It allows your users to connect with each other, create groups, post status updates, and much more.</p>
 
 <h3>What is BuddyPress?</h3>
-<p>BuddyPress is a powerful plugin that adds social networking features to your WordPress site, including:</p>
+
+<p>BuddyPress is often described as 'social networking in a box.' It provides all the core features you would expect from a social platform:</p>
+
 <ul>
-<li>User profiles and extended profile fields</li>
-<li>Member connections (friendships)</li>
-<li>Private messaging</li>
-<li>Activity streams</li>
-<li>User groups</li>
-<li>Discussion forums (with bbPress integration)</li>
+<li><strong>Member Profiles</strong>: Customizable user profiles</li>
+<li><strong>Activity Streams</strong>: Real-time updates of user activities</li>
+<li><strong>User Groups</strong>: Allow users to create and join groups</li>
+<li><strong>Private Messaging</strong>: Direct communication between users</li>
+<li><strong>Friend Connections</strong>: Users can connect with each other</li>
+<li><strong>Notifications</strong>: Keep users informed about relevant activities</li>
 </ul>
 
-<h3>Key Components</h3>
-<p>The essential components of BuddyPress include:</p>
+<h3>Why Use BuddyPress?</h3>
+
+<ul>
+<li><strong>Open Source</strong>: Free to use and modify</li>
+<li><strong>WordPress Integration</strong>: Seamlessly works with WordPress</li>
+<li><strong>Extensible</strong>: Many plugins specifically designed for BuddyPress</li>
+<li><strong>Community-Driven</strong>: Active development and support community</li>
+<li><strong>Customizable</strong>: Adapt it to suit your specific community needs</li>
+</ul>
+
+<h3>BuddyPress Components</h3>
+
+<p>BuddyPress is modular, allowing you to enable only the components you need:</p>
+
 <ol>
-<li><strong>Extended Profiles</strong>: Allow members to share information about themselves</li>
-<li><strong>Activity Streams</strong>: Display user activity across the site</li>
-<li><strong>Notifications</strong>: Alert users to relevant activity</li>
-<li><strong>Connections</strong>: Let users establish relationships</li>
-<li><strong>Groups</strong>: Enable users to form communities around shared interests</li>
-<li><strong>Private Messaging</strong>: Facilitate direct communication between members</li>
+<li><strong>Core</strong>: Essential functionality (always active)</li>
+<li><strong>Members</strong>: User management and directories</li>
+<li><strong>XProfile</strong>: Extended user profiles</li>
+<li><strong>Activity</strong>: Activity streams</li>
+<li><strong>Notifications</strong>: User notifications</li>
+<li><strong>Messaging</strong>: Private user-to-user messaging</li>
+<li><strong>Friends</strong>: Friend connections</li>
+<li><strong>Groups</strong>: User groups</li>
+<li><strong>Settings</strong>: User account settings</li>
+<li><strong>Blogs</strong>: Multi-site blog tracking (for WordPress Multisite)</li>
 </ol>
 
-<p>In this tutorial series, we'll explore each of these components in detail and show you how to configure them for your community.</p>|$basics_cat_id|1"
-        
-        "Installing and Configuring BuddyPress|<h2>Setting Up BuddyPress</h2>
-<p>This tutorial guides you through the installation and initial configuration of BuddyPress on your WordPress site.</p>
+<p>In the next tutorial, we'll cover how to install and configure BuddyPress on your WordPress site.</p>" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Introduction to BuddyPress' tutorial with ID: $intro_bp_id"
+
+install_bp_id=$(wp post create --post_title="Installing and Configuring BuddyPress" --post_name="installing-and-configuring-buddypress" --post_author="1" --post_content="<h2>Installing and Configuring BuddyPress</h2>
+
+<p>This tutorial guides you through the process of adding BuddyPress to your WordPress site and configuring its essential settings.</p>
 
 <h3>Installation</h3>
-<ol>
-<li>Log in to your WordPress admin dashboard</li>
-<li>Go to Plugins > Add New</li>
-<li>Search for \"BuddyPress\"</li>
-<li>Click \"Install Now\"</li>
-<li>Click \"Activate\" after installation completes</li>
-</ol>
-
-<h3>Initial Configuration</h3>
-<p>After activation, you'll see a new \"BuddyPress\" menu in your WordPress admin. Complete these initial setup steps:</p>
 
 <ol>
-<li>Go to BuddyPress > Components to enable the features you want</li>
-<li>Go to BuddyPress > Settings to configure general behavior</li>
-<li>Go to BuddyPress > Pages to see which pages were created</li>
-</ol>
-
-<h3>Component Selection</h3>
-<p>The core components include:</p>
+<li><strong>From WordPress Dashboard</strong>:
 <ul>
-<li><strong>Extended Profiles</strong>: RECOMMENDED - Allows users to customize their profiles</li>
-<li><strong>Account Settings</strong>: RECOMMENDED - Gives users control over account preferences</li>
-<li><strong>Activity Streams</strong>: RECOMMENDED - Shows recent activity across your site</li>
-<li><strong>Notifications</strong>: RECOMMENDED - Alerts members about relevant activity</li>
-<li><strong>Member Connections</strong>: Allows members to connect as friends</li>
-<li><strong>Private Messaging</strong>: Enables direct communication between members</li>
-<li><strong>User Groups</strong>: Lets members create and join groups</li>
-<li><strong>Site Tracking</strong>: Logs member activity across your WordPress site</li>
+<li>Go to Plugins &gt; Add New</li>
+<li>Search for 'BuddyPress'</li>
+<li>Click 'Install Now' and then 'Activate'</li>
 </ul>
+</li>
+<li><strong>Manual Installation</strong>:
+<ul>
+<li>Download BuddyPress from WordPress.org</li>
+<li>Upload the plugin folder to /wp-content/plugins/</li>
+<li>Activate through the 'Plugins' menu</li>
+</ul>
+</li>
+</ol>
 
-<p>Enable the components that best suit your community's needs.</p>
+<!-- wp:heading {\"level\":3} -->
+<h3>Initial Setup</h3>
+<!-- /wp:heading -->
 
+<!-- wp:paragraph -->
+<p>After activation, you'll see a 'BuddyPress' menu in your WordPress dashboard. Start by going to BuddyPress &gt; Components.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Configuring Components</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Select which components you want to activate:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li><strong>Core</strong>: (Required) The essential BuddyPress framework</li><li><strong>Members</strong>: User profiles and directories</li><li><strong>Extended Profiles</strong>: Custom profile fields</li><li><strong>Account Settings</strong>: User account management</li><li><strong>Activity Streams</strong>: Site-wide and user activity</li><li><strong>Notifications</strong>: User notifications system</li><li><strong>Friend Connections</strong>: Allow users to connect</li><li><strong>Private Messaging</strong>: User-to-user messages</li><li><strong>User Groups</strong>: Community groups functionality</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>Begin with just the essential components, and add more as needed.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>BuddyPress Settings</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Go to Settings &gt; BuddyPress to configure:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li><strong>Main Settings</strong>:
+<ul><li>Set roles that can bypass spam protection</li><li>Enable/disable @mentions functionality</li><li>Specify toolbar visibility</li></ul>
+</li><li><strong>Registration Settings</strong>:
+<ul><li>Enable/disable account activation emails</li><li>Allow custom profile fields during registration</li></ul>
+</li><li><strong>Profile Settings</strong>:
+<ul><li>Configure avatar settings</li><li>Set up profile visibility options</li></ul>
+</li><li><strong>Groups Settings</strong> (if enabled):
+<ul><li>Allow group creation by all members or admins only</li><li>Set default group visibility</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Page Setup</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyPress creates several pages automatically:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li>Activity</li><li>Members</li><li>Register</li><li>Activate</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>Verify these pages are created correctly in Pages &gt; All Pages.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Permalinks Configuration</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>For the best user experience:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to Settings &gt; Permalinks</li><li>Select 'Post name' as your permalink structure</li><li>Save Changes</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>This optimizes URLs for BuddyPress content.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Testing Your Setup</h3>
-<p>After configuration, test the following:</p>
-<ol>
-<li>Visit your site's front-end to verify BuddyPress pages are accessible</li>
-<li>Register a test user account</li>
-<li>Complete your profile</li>
-<li>Post an update to the activity stream</li>
-</ol>
+<!-- /wp:heading -->
 
-<p>In the next tutorial, we'll explore how to customize member profiles.</p>|$basics_cat_id|2"
-        
-        "Customizing Member Profiles|<h2>Enhancing User Profiles</h2>
-<p>One of BuddyPress's most powerful features is its extended profile fields. This tutorial shows you how to create a rich profile experience for your community members.</p>
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Visit your site's homepage</li><li>Check navigation for BuddyPress links</li><li>Create a test user account</li><li>Explore different features as this user</li></ol>
+<!-- /wp:list -->
 
-<h3>Understanding Profile Fields</h3>
-<p>BuddyPress organizes profile information into field groups, which contain individual fields. This hierarchical structure helps organize information logically.</p>
+<!-- wp:paragraph -->
+<p>In the next tutorial, we'll explore how to customize member profiles to create a personalized experience for your community members.</p>
+<!-- /wp:paragraph -->" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Installing and Configuring BuddyPress' tutorial with ID: $install_bp_id"
 
+profiles_bp_id=$(wp post create --post_title="Customizing Member Profiles" --post_name="customizing-member-profiles" --post_author="1" --post_content="<!-- wp:heading -->
+<h2>Customizing Member Profiles in BuddyPress</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Member profiles are at the heart of any social network. This tutorial will show you how to customize BuddyPress profiles to create a personalized experience for your community members.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Understanding Extended Profiles</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyPress's Extended Profiles (XProfile) component lets you create custom profile fields beyond what WordPress provides by default. These fields can collect various types of information from your members.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Enabling Extended Profiles</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to BuddyPress &gt; Components</li><li>Ensure the 'Extended Profiles' component is active</li><li>Save changes</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Profile Field Types</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyPress offers several field types:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li><strong>Text Box</strong>: Single line of text</li><li><strong>Multi-Line Text Area</strong>: Multiple lines of text</li><li><strong>Date Selector</strong>: Calendar date picker</li><li><strong>Radio Buttons</strong>: Select one from multiple options</li><li><strong>Checkboxes</strong>: Select multiple options</li><li><strong>Drop Down Select Box</strong>: Dropdown menu of options</li><li><strong>Multi-Select Box</strong>: Select multiple options from a list</li><li><strong>URL</strong>: Website address field</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Creating Profile Field Groups</h3>
-<ol>
-<li>Go to Users > Profile Fields in your WordPress admin</li>
-<li>Click \"Add New Field Group\"</li>
-<li>Enter a name (e.g., \"Personal Information\" or \"Professional Background\")</li>
-<li>Set the description and visibility options</li>
-<li>Click \"Save\"</li>
-</ol>
+<!-- /wp:heading -->
 
+<!-- wp:paragraph -->
+<p>Profile fields are organized into groups. To create a new group:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to Users &gt; Profile Fields</li><li>Click 'Add New Field Group'</li><li>Enter a name for the group (e.g., 'Personal Information')</li><li>Set the group description (optional)</li><li>Click 'Save'</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Adding Profile Fields</h3>
-<p>For each field group, you can add various field types:</p>
-<ol>
-<li>Text Box: For short text responses</li>
-<li>Text Area: For longer text entries</li>
-<li>Radio Buttons: For selecting one option from several</li>
-<li>Checkboxes: For selecting multiple options</li>
-<li>Dropdown: For selecting one option from a list</li>
-<li>Multi-select: For selecting multiple options from a list</li>
-<li>Date Selector: For selecting dates</li>
-<li>URL: For website links</li>
-</ol>
+<!-- /wp:heading -->
 
-<h3>Field Configuration Options</h3>
-<p>When creating a field, you can configure:</p>
-<ul>
-<li><strong>Required</strong>: Whether users must complete this field</li>
-<li><strong>Visibility</strong>: Who can see this field (public, members, friends, private)</li>
-<li><strong>Default Visibility</strong>: Initial visibility setting</li>
-<li><strong>Allow Custom Visibility</strong>: Let users change visibility per field</li>
-</ul>
+<!-- wp:paragraph -->
+<p>To add fields to a group:</p>
+<!-- /wp:paragraph -->
 
-<h3>Example: Professional Profile</h3>
-<p>Here's a practical example for a professional network:</p>
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to the field group</li><li>Click 'Add New Field'</li><li>Configure these settings:
+<ul><li>Field Name: What to call the field</li><li>Field Description: Explanation for users</li><li>Field Type: Select from available types</li><li>Required?: Whether users must complete this field</li><li>Visibility: Who can see this information</li></ul>
+</li><li>Click 'Save'</li></ol>
+<!-- /wp:list -->
 
-<p><strong>Field Group</strong>: Professional Background</p>
-<ol>
-<li>Text Box: Current Position</li>
-<li>Text Box: Company/Organization</li>
-<li>Text Area: Professional Bio</li>
-<li>Dropdown: Industry (with predefined options)</li>
-<li>Text Box: Years of Experience</li>
-<li>URL: LinkedIn Profile</li>
-</ol>
+<!-- wp:heading {\"level\":3} -->
+<h3>Field Visibility Options</h3>
+<!-- /wp:heading -->
 
-<p>In the next tutorial, we'll explore the activity stream and how members can interact with each other.</p>|$basics_cat_id|3"
-        
-        "Navigating the BuddyPress Interface|<h2>Getting Around in BuddyPress</h2>
-<p>This tutorial helps new users understand the BuddyPress interface and navigate its various sections.</p>
+<!-- wp:paragraph -->
+<p>BuddyPress lets you set visibility levels for each field:</p>
+<!-- /wp:paragraph -->
 
-<h3>Main Navigation Areas</h3>
-<p>After installing BuddyPress, your site will include these key navigation elements:</p>
+<!-- wp:list -->
+<ul><li><strong>Public</strong>: Visible to anyone</li><li><strong>All Members</strong>: Only visible to registered users</li><li><strong>Only Me</strong>: Private to the user</li><li><strong>My Friends</strong>: Only visible to connected friends</li></ul>
+<!-- /wp:list -->
 
-<ol>
-<li><strong>Members Directory</strong>: Lists all members of your community</li>
-<li><strong>Groups Directory</strong>: Shows all available groups (if Groups component is active)</li>
-<li><strong>Activity Stream</strong>: Displays recent activity across the site</li>
-<li><strong>Personal Menu</strong>: Gives access to the logged-in user's profile, messages, and settings</li>
-</ol>
+<!-- wp:heading {\"level\":3} -->
+<h3>Profile Field Order</h3>
+<!-- /wp:heading -->
 
-<h3>Understanding the Activity Stream</h3>
-<p>The activity stream is the central hub of your community, showing:</p>
-<ul>
-<li>Status updates from members</li>
-<li>New friendships formed</li>
-<li>Group creation and membership events</li>
-<li>New forum topics and replies</li>
-<li>Blog post publications (if enabled)</li>
-</ul>
+<!-- wp:paragraph -->
+<p>You can change the order of profile fields:</p>
+<!-- /wp:paragraph -->
 
-<p>Members can interact with activity items by:</p>
-<ul>
-<li>Liking/favoriting updates</li>
-<li>Commenting on updates</li>
-<li>Sharing updates (if enabled)</li>
-</ul>
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to Users &gt; Profile Fields</li><li>Drag and drop fields within groups</li><li>Save changes</li></ol>
+<!-- /wp:list -->
 
-<h3>Your Profile Area</h3>
-<p>Each member has a profile area with these sections:</p>
-<ul>
-<li><strong>Profile</strong>: View and edit personal information</li>
-<li><strong>Activity</strong>: Personal activity stream</li>
-<li><strong>Friends</strong>: Manage connections (if enabled)</li>
-<li><strong>Groups</strong>: View group memberships (if enabled)</li>
-<li><strong>Messages</strong>: Access private conversations (if enabled)</li>
-<li><strong>Settings</strong>: Modify account preferences</li>
-</ul>
+<!-- wp:heading {\"level\":3} -->
+<h3>Default Profile Fields</h3>
+<!-- /wp:heading -->
 
-<h3>Notification System</h3>
-<p>BuddyPress notifies you about relevant activity:</p>
-<ul>
-<li>Friend requests</li>
-<li>Messages received</li>
-<li>Mentions in updates</li>
-<li>Group invitations</li>
-<li>Replies to your content</li>
-</ul>
-<p>Check your notifications through the bell icon in the navigation bar.</p>
+<!-- wp:paragraph -->
+<p>BuddyPress creates a 'Base' field group with a 'Name' field by default. These can't be deleted but can be customized.</p>
+<!-- /wp:paragraph -->
 
-<p>In the next tutorial, we'll discuss how to interact effectively in the community.</p>|$basics_cat_id|4"
-    )
-    
-    # Group Management Tutorials
-    groups_tutorials=(
-        "Creating and Managing Groups|<h2>Building Communities with BuddyPress Groups</h2>
-<p>Groups are a powerful way to organize your community around shared interests or goals. This tutorial explains how to create and manage BuddyPress groups.</p>
+<!-- wp:heading {\"level\":3} -->
+<h3>Customizing the Profile Interface</h3>
+<!-- /wp:heading -->
 
-<h3>Understanding Group Types</h3>
-<p>BuddyPress supports three types of groups:</p>
-<ul>
-<li><strong>Public</strong>: Visible to everyone, anyone can join</li>
-<li><strong>Private</strong>: Visible in directories, but joining requires approval</li>
-<li><strong>Hidden</strong>: Not listed in directories, members must be invited</li>
-</ul>
+<!-- wp:paragraph -->
+<p>To modify how profiles appear:</p>
+<!-- /wp:paragraph -->
 
-<h3>Creating a New Group</h3>
-<ol>
-<li>Navigate to Groups > Create a Group</li>
-<li>Enter the group name, description, and choose privacy settings</li>
-<li>Upload a group avatar and cover image (optional)</li>
-<li>Configure group settings</li>
-<li>Invite initial members (optional)</li>
-<li>Complete creation</li>
-</ol>
+<!-- wp:list {\"ordered\":true} -->
+<ol><li><strong>Using a BuddyPress-compatible theme</strong> like BuddyX</li><li><strong>CSS customization</strong> for fine-tuning appearance</li><li><strong>BuddyPress template overrides</strong> for advanced customization</li></ol>
+<!-- /wp:list -->
 
-<h3>Group Administration</h3>
-<p>As a group admin, you can:</p>
-<ul>
-<li>Modify group details and settings</li>
-<li>Manage membership (approve/deny requests, remove members)</li>
-<li>Assign roles (admin, moderator, member)</li>
-<li>Enable/disable group features</li>
-<li>Delete the group if necessary</li>
-</ul>
+<!-- wp:heading {\"level\":3} -->
+<h3>Member Types</h3>
+<!-- /wp:heading -->
 
-<h3>Group Roles Explained</h3>
-<ul>
-<li><strong>Admin</strong>: Full control over group settings and membership</li>
-<li><strong>Moderator</strong>: Can approve members and moderate content</li>
-<li><strong>Member</strong>: Can participate in group activities</li>
-</ul>
+<!-- wp:paragraph -->
+<p>For more advanced profile categorization, you can create Member Types:</p>
+<!-- /wp:paragraph -->
 
-<h3>Activating Group Features</h3>
-<p>Groups can include various features:</p>
-<ul>
-<li>Forum discussions (requires bbPress)</li>
-<li>Photo albums</li>
-<li>Documents sharing</li>
-<li>Group-specific activity feed</li>
-</ul>
-<p>Enable these in the group settings area.</p>
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Using code in a custom plugin</li><li>Or using plugins like 'BP Member Types'</li></ol>
+<!-- /wp:list -->
 
+<!-- wp:paragraph -->
+<p>This allows you to categorize users and provide different experiences.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Best Practices</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul><li>Keep required fields to a minimum</li><li>Create logical field groupings</li><li>Provide clear field descriptions</li><li>Consider privacy implications</li><li>Test profiles on mobile devices</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>In the next tutorial, we'll cover the BuddyPress interface and how users can navigate through your social network.</p>
+<!-- /wp:paragraph -->" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Customizing Member Profiles' tutorial with ID: $profiles_bp_id"
+
+# Group Management tutorial
+groups_bp_id=$(wp post create --post_title="Creating and Managing Groups" --post_name="creating-and-managing-groups" --post_author="1" --post_content="<!-- wp:heading -->
+<h2>Creating and Managing Groups in BuddyPress</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Groups are a powerful feature in BuddyPress that allow your community members to organize around shared interests. This tutorial covers everything you need to know about creating and managing groups.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Enabling Group Functionality</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to BuddyPress &gt; Components</li><li>Ensure the 'User Groups' component is activated</li><li>Save your changes</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Group Types and Visibility</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyPress offers three types of groups:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li><strong>Public Groups</strong>: Visible to everyone, anyone can join</li><li><strong>Private Groups</strong>: Visible in directories, but joining requires approval</li><li><strong>Hidden Groups</strong>: Not listed in directories, members can only join by invitation</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Creating a Group as an Administrator</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to Dashboard &gt; BuddyPress &gt; Groups</li><li>Click 'Add New'</li><li>Fill in the group details:
+<ul><li>Name and description</li><li>Privacy settings</li><li>Enable/disable features (forum, photos, etc.)</li><li>Upload an avatar</li></ul>
+</li><li>Click 'Create Group'</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Group Management Tools for Admins</h3>
+<!-- /wp:heading -->
+
+<!-- wp:heading {\"level\":4} -->
+<h4>Managing Members</h4>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to the group</li><li>Click 'Manage' tab</li><li>Select 'Members'</li><li>From here you can:
+<ul><li>Promote/demote members</li><li>Remove members</li><li>Ban problematic users</li><li>Manage membership requests</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":4} -->
+<h4>Group Settings</h4>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to the group</li><li>Click 'Manage' tab</li><li>Select 'Settings'</li><li>Here you can modify:
+<ul><li>Group name and description</li><li>Group avatar</li><li>Privacy settings</li><li>Group features</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Group Roles and Permissions</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyPress has three group roles:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li><strong>Admin</strong>: Full control over group</li><li><strong>Moderator</strong>: Can moderate content and members</li><li><strong>Member</strong>: Standard access to group content</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>To change a member's role:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to the Members list</li><li>Find the member</li><li>Click on their current role</li><li>Select the new role from the dropdown</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Group Discussion Forums</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>To enable forums, you'll need bbPress installed. Once active:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to group settings</li><li>Enable the forum feature</li><li>Members can now start discussions</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Best Practices for Group Management</h3>
-<ol>
-<li>Create clear group guidelines</li>
-<li>Appoint multiple admins/moderators for active groups</li>
-<li>Regularly engage with group content</li>
-<li>Archive inactive groups rather than deleting them</li>
-</ol>
+<!-- /wp:heading -->
 
-<p>In the next tutorial, we'll explore strategies for fostering active group participation.</p>|$groups_cat_id|1"
-        
-        "Setting Up Group Discussions|<h2>Facilitating Conversations in BuddyPress Groups</h2>
-<p>Group discussions are the heart of community engagement. This tutorial covers how to set up and manage effective discussions in your BuddyPress groups.</p>
+<!-- wp:list -->
+<ul><li>Create clear guidelines for each group</li><li>Assign multiple administrators for active groups</li><li>Regularly review membership requests</li><li>Archive inactive groups rather than deleting them</li><li>Use group announcements for important updates</li></ul>
+<!-- /wp:list -->
 
-<h3>Enabling Group Forums</h3>
-<p>To enable discussions in your groups:</p>
-<ol>
-<li>Ensure bbPress is installed and activated</li>
-<li>Go to BuddyPress > Settings > Group Settings</li>
-<li>Enable the \"Group Forums\" option</li>
-<li>In each group's admin panel, enable the Forums feature</li>
-</ol>
+<!-- wp:heading {\"level\":3} -->
+<h3>Customizing Group Features</h3>
+<!-- /wp:heading -->
 
-<h3>Creating Discussion Categories</h3>
-<p>Organize conversations by creating forum categories:</p>
-<ol>
-<li>Navigate to the group's Forum tab</li>
-<li>As an admin, select \"Add New Topic Category\"</li>
-<li>Name the category (e.g., \"General Discussion\" or \"Resources\")</li>
-<li>Add a description to clarify its purpose</li>
-<li>Set any category-specific rules or guidelines</li>
-</ol>
+<!-- wp:paragraph -->
+<p>You can extend group functionality with plugins:</p>
+<!-- /wp:paragraph -->
 
-<h3>Starting New Topics</h3>
-<p>To initiate a discussion:</p>
-<ol>
-<li>Go to the group's Forum section</li>
-<li>Click \"New Topic\"</li>
-<li>Enter a descriptive title</li>
-<li>Write your message using the text editor</li>
-<li>Select the appropriate category</li>
-<li>Add tags to improve searchability</li>
-<li>Submit the topic</li>
-</ol>
+<!-- wp:list -->
+<ul><li>BuddyPress Group Email Subscription</li><li>BuddyPress Docs</li><li>GamiPress for BuddyPress</li></ul>
+<!-- /wp:list -->
 
+<!-- wp:paragraph -->
+<p>In the next tutorial, we'll cover setting up group discussions to facilitate engagement within your community groups.</p>
+<!-- /wp:paragraph -->" --post_category=$group_management_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Creating and Managing Groups' tutorial with ID: $groups_bp_id"
+
+discussions_bp_id=$(wp post create --post_title="Setting Up Group Discussions" --post_name="setting-up-group-discussions" --post_author="1" --post_content="<!-- wp:heading -->
+<h2>Setting Up Group Discussions in BuddyPress</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Group discussions are central to creating engagement in your BuddyPress community. This tutorial will guide you through setting up and managing effective group discussions.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Discussion Types in BuddyPress</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyPress offers two main types of group discussions:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li><strong>Activity Updates</strong>: Quick posts and comments within the group activity stream</li><li><strong>Forum Discussions</strong>: More structured conversations (requires bbPress)</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Enabling Group Forums with bbPress</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li><strong>Install bbPress</strong>:
+<ul><li>Go to Plugins &gt; Add New</li><li>Search for 'bbPress'</li><li>Install and activate</li></ul>
+</li><li><strong>Enable BuddyPress-bbPress Integration</strong>:
+<ul><li>Go to Settings &gt; BuddyPress &gt; Options</li><li>Enable 'bbPress Integration'</li><li>Save changes</li></ul>
+</li><li><strong>Activate Forums for Groups</strong>:
+<ul><li>Go to BuddyPress &gt; Settings</li><li>Enable 'Allow group creators to enable discussion forum'</li><li>Save changes</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Creating Forums for Existing Groups</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to the group as an admin</li><li>Go to 'Manage' &gt; 'Details'</li><li>Enable the 'Forum' feature</li><li>Save changes</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Forum Structure Within Groups</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Once enabled, each group gets:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li>A dedicated forum area</li><li>Ability to create topics (threads)</li><li>Ability to reply to topics</li><li>Notification options for members</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Creating Discussion Topics</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>As a group member:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to the group</li><li>Select the 'Forum' tab</li><li>Click 'New Topic'</li><li>Enter title and content</li><li>Set topic tags (optional)</li><li>Select options like subscription preferences</li><li>Click 'Post'</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Discussion Moderation Tools</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
 <p>Group admins and moderators can:</p>
-<ul>
-<li>Sticky important topics to keep them at the top</li>
-<li>Close topics that have reached a resolution</li>
-<li>Split topics if conversations diverge</li>
-<li>Merge related topics</li>
-<li>Edit or delete inappropriate content</li>
-</ul>
+<!-- /wp:paragraph -->
 
-<h3>Encouraging Healthy Discussions</h3>
-<ol>
-<li>Create a \"Welcome\" or \"Start Here\" topic with group rules</li>
-<li>Ask open-ended questions to stimulate conversation</li>
-<li>Recognize and thank active contributors</li>
-<li>Summarize long discussions periodically</li>
-<li>Use polls to gather opinions on important topics</li>
-</ol>
+<!-- wp:list -->
+<ul><li>Sticky important topics</li><li>Close topics to prevent new replies</li><li>Spam-flag problematic content</li><li>Delete inappropriate content</li></ul>
+<!-- /wp:list -->
 
-<h3>Handling Challenging Situations</h3>
-<ul>
-<li>Address conflicts promptly and privately when possible</li>
-<li>Be clear about which community guidelines were violated</li>
-<li>Focus on behaviors rather than personalities</li>
-<li>Provide warnings before taking stronger actions</li>
-</ul>
+<!-- wp:heading {\"level\":3} -->
+<h3>Enhancing Discussions with Media</h3>
+<!-- /wp:heading -->
 
-<p>In the next tutorial, we'll explore how to expand your group's capabilities with additional features.</p>|$groups_cat_id|2"
-        
-        "Organizing Group Events|<h2>Planning Activities with BuddyPress Group Events</h2>
-<p>Events bring community members together for real-time engagement. This tutorial explains how to create and manage events within BuddyPress groups.</p>
+<!-- wp:paragraph -->
+<p>Enhance discussions by installing plugins that allow:</p>
+<!-- /wp:paragraph -->
 
-<h3>Adding Events Functionality</h3>
-<p>BuddyPress doesn't include events by default. You'll need a compatible plugin:</p>
-<ol>
-<li>Install and activate an events plugin like \"BuddyPress Group Events\" or \"Events Manager\"</li>
-<li>Configure the plugin settings to work with BuddyPress groups</li>
-<li>Enable the Events feature in your group settings</li>
-</ol>
+<!-- wp:list -->
+<ul><li>Image attachments</li><li>Document sharing</li><li>Video embeds</li><li>GIF integration</li></ul>
+<!-- /wp:list -->
 
-<h3>Creating a Group Event</h3>
-<ol>
-<li>Navigate to your group's Events section</li>
-<li>Click \"Add New Event\"</li>
-<li>Enter the event title and description</li>
-<li>Set the date, time, and duration</li>
-<li>Specify the location (physical or virtual)</li>
-<li>Add event categories and tags</li>
-<li>Upload an event image</li>
-<li>Set attendance limits if needed</li>
-<li>Configure RSVP options</li>
-<li>Publish the event</li>
-</ol>
+<!-- wp:heading {\"level\":3} -->
+<h3>Notification Settings</h3>
+<!-- /wp:heading -->
 
-<h3>Managing Event RSVPs</h3>
-<p>Track attendance with these features:</p>
-<ul>
-<li>View the list of attendees</li>
-<li>Send messages to registered participants</li>
-<li>Export attendee information</li>
-<li>Set up waitlists for popular events</li>
-<li>Track attendance statistics</li>
-</ul>
+<!-- wp:paragraph -->
+<p>Members can manage their notification preferences:</p>
+<!-- /wp:paragraph -->
 
-<h3>Promoting Group Events</h3>
-<ol>
-<li>Post announcements in the group activity stream</li>
-<li>Send direct invitations to relevant members</li>
-<li>Create reminder posts as the event approaches</li>
-<li>Share the event on main site activity if appropriate</li>
-<li>Consider email notifications for important updates</li>
-</ol>
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to their profile settings</li><li>Navigate to 'Notifications'</li><li>Configure forum and discussion alerts</li></ol>
+<!-- /wp:list -->
 
-<h3>Virtual and Hybrid Events</h3>
-<p>For online gatherings:</p>
-<ul>
-<li>Include clear instructions for accessing virtual platforms</li>
-<li>Test technology in advance</li>
-<li>Provide alternatives for participation</li>
-<li>Consider recording sessions for those who can't attend</li>
-<li>Gather feedback to improve future events</li>
-</ul>
+<!-- wp:heading {\"level\":3} -->
+<h3>Best Practices for Group Discussions</h3>
+<!-- /wp:heading -->
 
-<h3>Post-Event Follow-up</h3>
-<ol>
-<li>Thank participants for attending</li>
-<li>Share highlights, photos, or recordings</li>
-<li>Create a discussion thread for continuing conversations</li>
-<li>Collect feedback through surveys</li>
-<li>Announce upcoming events while interest is high</li>
-</ol>
+<!-- wp:list -->
+<ul><li>Create clear posting guidelines</li><li>Start with a few engaging topics to spark conversation</li><li>Assign topic categories if your forum grows large</li><li>Regularly participate as an administrator</li><li>Feature the most helpful or interesting discussions</li><li>Encourage members to use the subscription feature</li></ul>
+<!-- /wp:list -->
 
-<p>In the next tutorial, we'll explore how to effectively grow your group membership.</p>|$groups_cat_id|3"
-    )
-    
-    # Member Management Tutorials
-    members_tutorials=(
-        "Managing Membership Requests|<h2>Handling Membership in Your BuddyPress Community</h2>
-<p>This tutorial explains how to effectively manage user registrations and membership requests for your BuddyPress site and groups.</p>
+<!-- wp:heading {\"level\":3} -->
+<h3>Common Issues and Solutions</h3>
+<!-- /wp:heading -->
 
-<h3>Site Registration Settings</h3>
-<p>Configure who can join your community:</p>
-<ol>
-<li>Go to Settings > General in your WordPress admin</li>
-<li>Set \"Membership\" to allow or disallow new registrations</li>
-<li>Go to BuddyPress > Settings to configure BuddyPress-specific options</li>
-<li>Consider requiring email activation for new accounts</li>
-</ol>
+<!-- wp:list -->
+<ul><li><strong>Low Participation</strong>: Create a 'Welcome' or 'Introduce Yourself' topic</li><li><strong>Off-Topic Posts</strong>: Create specific threads for different conversation types</li><li><strong>Spam</strong>: Implement moderation rules and approval workflows</li><li><strong>Overwhelming Volume</strong>: Organize with tags and categories</li></ul>
+<!-- /wp:list -->
 
-<h3>Custom Registration Fields</h3>
-<p>Gather relevant information during registration:</p>
-<ol>
-<li>Go to Users > Profile Fields</li>
-<li>Create a field group for registration (e.g., \"Signup Information\")</li>
-<li>Add fields and mark them as \"Required at Registration\"</li>
-<li>Consider adding a Terms & Conditions acceptance checkbox</li>
-</ol>
+<!-- wp:heading {\"level\":3} -->
+<h3>Measuring Discussion Success</h3>
+<!-- /wp:heading -->
 
-<h3>Managing Group Membership Requests</h3>
-<p>For private groups, handle join requests:</p>
-<ol>
-<li>Go to the group's admin area</li>
-<li>Select \"Requests\" to see pending requests</li>
-<li>Review each request (profile, message if included)</li>
-<li>Accept or reject requests with appropriate messaging</li>
-</ol>
+<!-- wp:paragraph -->
+<p>Monitor these metrics to gauge discussion health:</p>
+<!-- /wp:paragraph -->
 
-<h3>Creating a Membership Approval Workflow</h3>
-<p>For sites requiring manual approval:</p>
-<ol>
-<li>Install a membership approval plugin (e.g., \"BP Registration Options\")</li>
-<li>Configure the approval process</li>
-<li>Create standard criteria for approving members</li>
-<li>Set up email templates for approval/rejection</li>
-</ol>
+<!-- wp:list -->
+<ul><li>Number of new topics per week</li><li>Average replies per topic</li><li>Member participation percentage</li><li>Topic view counts</li></ul>
+<!-- /wp:list -->
 
-<h3>Bulk Member Management</h3>
-<ul>
-<li>Filter members by role, activity date, or profile data</li>
-<li>Perform bulk actions (add to group, change role, etc.)</li>
-<li>Send announcements to specific member segments</li>
-</ul>
+<!-- wp:paragraph -->
+<p>In the next tutorial, we'll explore organizing group events to further engage your community members.</p>
+<!-- /wp:paragraph -->" --post_category=$group_management_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Setting Up Group Discussions' tutorial with ID: $discussions_bp_id"
 
-<h3>Handling Problematic Members</h3>
-<ol>
-<li>Create clear community guidelines</li>
-<li>Use a graduated response system:
-  <ul>
-    <li>Private message for first offenses</li>
-    <li>Temporary suspension for repeated issues</li>
-    <li>Permanent ban for serious violations</li>
-  </ul>
-</li>
-<li>Document incidents and actions taken</li>
-<li>Consider having an appeals process</li>
-</ol>
+# BuddyX Theme tutorial
+buddyx_intro_id=$(wp post create --post_title="Introduction to BuddyX Theme" --post_name="introduction-to-buddyx-theme" --post_author="1" --post_content="<!-- wp:heading -->
+<h2>Introduction to BuddyX Theme</h2>
+<!-- /wp:heading -->
 
-<p>In the next tutorial, we'll explore how to encourage positive communication between members.</p>|$members_cat_id|1"
-        
-        "Setting Up Friendship Connections|<h2>Building Relationships with BuddyPress Connections</h2>
-<p>The Connections (Friends) component allows members to create a network of relationships within your community. This tutorial explains how to set up and manage this feature.</p>
+<!-- wp:paragraph -->
+<p>BuddyX is a modern, lightweight theme specifically designed for BuddyPress websites. It enhances the social networking features of your site while providing a clean, responsive design.</p>
+<!-- /wp:paragraph -->
 
-<h3>Enabling the Connections Component</h3>
-<ol>
-<li>Go to BuddyPress > Components in your WordPress admin</li>
-<li>Activate the \"Member Connections\" component</li>
-<li>Save your changes</li>
-</ol>
-
-<h3>Customizing Connection Settings</h3>
-<p>Configure how connections work:</p>
-<ol>
-<li>Go to BuddyPress > Settings</li>
-<li>Scroll to the Connections section</li>
-<li>Set options such as:
-  <ul>
-    <li>Allow friendship cancellations</li>
-    <li>Connection button text (\"Add Friend\" vs. \"Connect\" etc.)</li>
-    <li>Connection request notification settings</li>
-  </ul>
-</li>
-</ol>
-
-<h3>Creating Connections as a User</h3>
-<p>Explain to your members how to:</p>
-<ol>
-<li>Visit another member's profile</li>
-<li>Click the \"Add Friend\" or \"Connect\" button</li>
-<li>Add a personal message with the request (if enabled)</li>
-<li>Wait for acceptance</li>
-<li>Manage pending requests from the Connections tab</li>
-</ol>
-
-<h3>Connection Visibility Options</h3>
-<p>Control who can see member connections:</p>
-<ul>
-<li>Go to BuddyPress > Settings > Visibility</li>
-<li>Configure who can see a user's connections:
-  <ul>
-    <li>Everyone</li>
-    <li>Logged-in members only</li>
-    <li>Only the user's connections</li>
-    <li>Only the user themselves</li>
-  </ul>
-</li>
-</ul>
-
-<h3>Leveraging Connections for Community Building</h3>
-<ol>
-<li>Show mutual connections to help users find relevant people</li>
-<li>Use connection counts as reputation indicators</li>
-<li>Recommend potential connections based on groups or interests</li>
-<li>Create exclusive content or features for members with connected status</li>
-</ol>
-
-<h3>Managing Connection Issues</h3>
-<ul>
-<li>Help users block unwanted connection requests</li>
-<li>Provide guidance for gracefully declining requests</li>
-<li>Create protocols for reporting harassment through connection features</li>
-<li>Monitor for unusual connection patterns that may indicate spam accounts</li>
-</ul>
-
-<p>In the next tutorial, we'll explore how to implement and manage private messaging between members.</p>|$members_cat_id|2"
-        
-        "Implementing Private Messaging|<h2>Facilitating Member Communication with BuddyPress Messages</h2>
-<p>Private messaging allows members to communicate directly and privately. This tutorial covers how to set up and manage the messaging system in BuddyPress.</p>
-
-<h3>Enabling the Messages Component</h3>
-<ol>
-<li>Go to BuddyPress > Components in your WordPress admin</li>
-<li>Activate the \"Private Messaging\" component</li>
-<li>Save your changes</li>
-</ol>
-
-<h3>Configuring Message Settings</h3>
-<p>Customize the messaging experience:</p>
-<ol>
-<li>Go to BuddyPress > Settings</li>
-<li>Scroll to the Messages section</li>
-<li>Configure options such as:
-  <ul>
-    <li>Auto-suggest recipients when composing</li>
-    <li>Allow message threading vs. individual messages</li>
-    <li>Set message notification preferences</li>
-    <li>Configure per-user message limits (if needed)</li>
-  </ul>
-</li>
-</ol>
-
-<h3>Setting Up Message Permissions</h3>
-<p>Control who can message whom:</p>
-<ul>
-<li>Allow all members to message anyone</li>
-<li>Restrict messaging to connected members only</li>
-<li>Create role-based messaging restrictions</li>
-<li>Consider plugins for additional control over messaging permissions</li>
-</ul>
-
-<h3>Creating Admin Announcements</h3>
-<p>The messaging system can be used for site-wide communication:</p>
-<ol>
-<li>Install a mass messaging plugin (e.g., \"BP Mass Messaging\")</li>
-<li>Compose your announcement</li>
-<li>Select recipient groups (all users, specific roles, etc.)</li>
-<li>Schedule or send immediately</li>
-<li>Track read receipts if available</li>
-</ol>
-
-<h3>Message Moderation and Spam Control</h3>
-<ul>
-<li>Implement message content filtering for inappropriate content</li>
-<li>Set rate limits to prevent message flooding</li>
-<li>Create a reporting system for problematic messages</li>
-<li>Consider pre-moderation for new or flagged users</li>
-</ul>
-
-<h3>User Interface Enhancements</h3>
-<p>Improve the messaging experience:</p>
-<ul>
-<li>Add emoji support</li>
-<li>Enable file attachments (with appropriate security measures)</li>
-<li>Implement real-time notifications for new messages</li>
-<li>Consider AJAX-based interfaces for smoother user experience</li>
-</ul>
-
-<p>In the next tutorial, we'll explore how to effectively manage user roles and permissions.</p>|$members_cat_id|3"
-    )
-    
-    # Activity Streams Tutorials
-    activity_tutorials=(
-        "Understanding the Activity Stream|<h2>Mastering the BuddyPress Activity Component</h2>
-<p>The activity stream is the pulse of your BuddyPress community. This tutorial explains how it works and how to configure it effectively.</p>
-
-<h3>What is the Activity Stream?</h3>
-<p>The activity stream displays chronological updates about actions across your community, including:</p>
-<ul>
-<li>Status updates from members</li>
-<li>New friendships and connections</li>
-<li>Group creations and activities</li>
-<li>Blog post publications</li>
-<li>Profile updates</li>
-<li>Forum discussions</li>
-</ul>
-
-<h3>Types of Activity Streams</h3>
-<p>BuddyPress provides several activity views:</p>
-<ol>
-<li><strong>Sitewide Activity</strong>: All activity across the community</li>
-<li><strong>Personal Activity</strong>: A member's own activities</li>
-<li><strong>Friends Activity</strong>: Updates from connected members</li>
-<li><strong>Group Activity</strong>: Updates from specific groups</li>
-<li><strong>Mentions</strong>: Activities where a user is mentioned</li>
-<li><strong>Favorites</strong>: Activities a user has marked as favorite</li>
-</ol>
-
-<h3>Configuring Activity Settings</h3>
-<ol>
-<li>Go to BuddyPress > Settings > Activity</li>
-<li>Choose which actions generate activity items</li>
-<li>Set activity display preferences</li>
-<li>Configure comment and reply settings</li>
-<li>Set up moderation options if needed</li>
-</ol>
-
-<h3>Activity Privacy and Scope</h3>
-<p>Control who sees what activities:</p>
-<ul>
-<li>Public vs. member-only activity visibility</li>
-<li>Group-specific activity privacy settings</li>
-<li>User-level privacy controls for status updates</li>
-<li>Role-based activity visibility restrictions</li>
-</ul>
-
-<h3>Activity Interactions</h3>
-<p>Members can engage with activity items:</p>
-<ul>
-<li>Like/favorite updates</li>
-<li>Comment on activities</li>
-<li>Share or repost (if enabled)</li>
-<li>Mention other users with @username</li>
-<li>Add hashtags for topic categorization</li>
-</ul>
-
-<h3>Extending Activity Functionality</h3>
-<p>Consider these enhancements:</p>
-<ul>
-<li>Rich media embeds (videos, images, links)</li>
-<li>Activity filtering by type</li>
-<li>Hashtag support and trending topics</li>
-<li>Activity pinning for important announcements</li>
-<li>Advanced notification options</li>
-</ul>
-
-<p>In the next tutorial, we'll explore activity moderation and keeping your community healthy.</p>|$activity_cat_id|1"
-        
-        "Posting and Interacting with Updates|<h2>Creating Engaging Content in Your BuddyPress Community</h2>
-<p>This tutorial covers how members can effectively post updates and interact with content in the activity stream.</p>
-
-<h3>Posting Status Updates</h3>
-<ol>
-<li>Navigate to the activity stream or profile</li>
-<li>Locate the update form (\"What's new?\" or similar text)</li>
-<li>Compose your update in the text area</li>
-<li>Add formatting if supported (bold, italic, etc.)</li>
-<li>Set privacy level if available (public, friends, etc.)</li>
-<li>Click \"Post Update\" to publish</li>
-</ol>
-
-<h3>Enhancing Updates with Media</h3>
-<p>Create richer updates with:</p>
-<ul>
-<li>Photos and images</li>
-<li>Videos (embedded or uploaded)</li>
-<li>Links with automatic previews</li>
-<li>Documents and files</li>
-<li>Polls and surveys (with additional plugins)</li>
-</ul>
-
-<h3>Using Mentions and Hashtags</h3>
-<p>Connect your content to people and topics:</p>
-<ul>
-<li>Mention users with @username to notify them</li>
-<li>Create hashtags with #topic to categorize content</li>
-<li>Use hashtags consistently for ongoing discussions</li>
-<li>Search for hashtags to find related content</li>
-</ul>
-
-<h3>Commenting and Replying</h3>
-<ol>
-<li>Click the \"Comment\" link below an activity item</li>
-<li>Enter your comment in the text field</li>
-<li>Use @mentions to direct comments to specific users</li>
-<li>Reply to specific comments when threading is enabled</li>
-<li>Edit or delete your comments if needed</li>
-</ol>
-
-<h3>Using Reactions and Favorites</h3>
-<ul>
-<li>Click the \"Like\" or reaction button to show appreciation</li>
-<li>Use the \"Favorite\" option to save items for later reference</li>
-<li>View your favorites list from your profile</li>
-<li>Understand that reactions may be visible to others</li>
-</ul>
-
-<h3>Activity Etiquette Guidelines</h3>
-<ol>
-<li>Keep updates relevant to the community's purpose</li>
-<li>Be respectful in comments and replies</li>
-<li>Avoid excessive posting or spammy behavior</li>
-<li>Use appropriate content warnings when needed</li>
-<li>Respect privacy settings and boundaries</li>
-</ol>
-
-<p>In the next tutorial, we'll explore how to effectively moderate activity content.</p>|$activity_cat_id|2"
-        
-        "Moderating Activity Content|<h2>Maintaining a Healthy Activity Stream</h2>
-<p>This tutorial explains how to effectively moderate content in your BuddyPress activity stream to ensure a positive community experience.</p>
-
-<h3>Setting Up Moderation Systems</h3>
-<ol>
-<li>Establish clear community guidelines</li>
-<li>Create a moderation team with defined roles</li>
-<li>Install moderation plugins like:
-  <ul>
-    <li>BuddyPress Moderation</li>
-    <li>BadgeOS for positive reinforcement</li>
-    <li>Block, Suspend, Report for member management</li>
-  </ul>
-</li>
-<li>Configure automatic content filtering</li>
-</ol>
-
-<h3>Content Filtering Options</h3>
-<p>Control problematic content with:</p>
-<ul>
-<li>Word filters for profanity and prohibited terms</li>
-<li>Spam detection algorithms</li>
-<li>Link restrictions to prevent malicious URLs</li>
-<li>Attachment scanning for malware</li>
-<li>Rate limiting to prevent flooding</li>
-</ul>
-
-<h3>Manual Moderation Actions</h3>
-<p>Moderators can take these actions:</p>
-<ol>
-<li>Hide/delete inappropriate updates or comments</li>
-<li>Issue warnings to members</li>
-<li>Temporarily suspend posting privileges</li>
-<li>Ban repeat offenders</li>
-<li>Document incidents for reference</li>
-</ol>
-
-<h3>Implementing a Reporting System</h3>
-<ol>
-<li>Add a \"Report\" button to activity items</li>
-<li>Create a reporting form with reason categories</li>
-<li>Set up notifications for moderators</li>
-<li>Establish a review workflow for reports</li>
-<li>Provide feedback to users who submit reports</li>
-</ol>
-
-<h3>Pre-Moderation for New Members</h3>
-<ul>
-<li>Consider approving first posts from new accounts</li>
-<li>Implement a probation period for new members</li>
-<li>Gradually increase posting privileges based on trust</li>
-<li>Use captchas or verification for new accounts</li>
-</ul>
-
-<h3>Creating a Positive Culture</h3>
-<ol>
-<li>Lead by example with moderator content</li>
-<li>Highlight exemplary community contributions</li>
-<li>Publicly acknowledge helpful members</li>
-<li>Create a recognition system for valuable participation</li>
-<li>Provide constructive feedback rather than just punishment</li>
-</ol>
-
-<p>In the next tutorial, we'll explore how to customize activity notifications to keep members engaged.</p>|$activity_cat_id|3"
-    )
-    
-    # BuddyX Theme Tutorials
-    buddyx_tutorials=(
-        "Introduction to BuddyX Theme|<h2>Getting Started with BuddyX</h2>
-<p>BuddyX is a powerful theme designed specifically for BuddyPress communities. This tutorial introduces its key features and basic setup.</p>
-
+<!-- wp:heading {\"level\":3} -->
 <h3>What is BuddyX?</h3>
-<p>BuddyX is a responsive WordPress theme built to enhance BuddyPress-powered social networks with:</p>
-<ul>
-<li>Modern, clean design optimized for community engagement</li>
-<li>Seamless BuddyPress integration with enhanced styling</li>
-<li>Flexible layout options for various community types</li>
-<li>Performance optimization for busy communities</li>
-<li>Mobile-first responsive design</li>
-</ul>
+<!-- /wp:heading -->
 
-<h3>Installing BuddyX</h3>
-<ol>
-<li>Go to Appearance > Themes > Add New in your WordPress admin</li>
-<li>Search for \"BuddyX\"</li>
-<li>Click \"Install\" and then \"Activate\"</li>
-<li>Alternatively, download from WordPress.org and upload via the theme installer</li>
-</ol>
+<!-- wp:paragraph -->
+<p>BuddyX is a WordPress theme built to work seamlessly with BuddyPress. It provides specialized styling and layouts for all BuddyPress components, ensuring your social network not only functions well but looks great too.</p>
+<!-- /wp:paragraph -->
 
-<h3>Initial Theme Setup</h3>
-<ol>
-<li>Go to Appearance > Customize</li>
-<li>Browse through the customization panels:
-  <ul>
-    <li>Site Identity (logo, title, tagline)</li>
-    <li>Colors and Typography</li>
-    <li>Layout Options</li>
-    <li>Header and Navigation</li>
-    <li>BuddyPress Settings</li>
-    <li>Footer Options</li>
-  </ul>
-</li>
-<li>Make initial adjustments to match your brand</li>
-<li>Save changes</li>
-</ol>
-
+<!-- wp:heading {\"level\":3} -->
 <h3>Key Features of BuddyX</h3>
-<ul>
-<li><strong>Community-focused layouts</strong>: Optimized for member interaction</li>
-<li><strong>Activity stream enhancements</strong>: Improved readability and engagement</li>
-<li><strong>Profile layouts</strong>: Modern, clean member profiles</li>
-<li><strong>Group customizations</strong>: Better group navigation and content organization</li>
-<li><strong>Dark mode support</strong>: Reduces eye strain for night browsing</li>
-<li><strong>Header variations</strong>: Multiple header layouts to choose from</li>
-</ul>
+<!-- /wp:heading -->
 
-<h3>BuddyX vs. Standard BuddyPress Themes</h3>
-<p>Advantages of BuddyX over default themes:</p>
-<ul>
-<li>Modern social network aesthetic vs. basic designs</li>
-<li>More customization options without coding</li>
-<li>Better mobile experience</li>
-<li>Improved navigation for community features</li>
-<li>Enhanced performance optimization</li>
-</ul>
+<!-- wp:list -->
+<ul><li><strong>BuddyPress Integration</strong>: Perfectly styled BuddyPress elements</li><li><strong>Responsive Design</strong>: Works flawlessly on all devices</li><li><strong>Customizer Options</strong>: Extensive theme customization without coding</li><li><strong>Header Variations</strong>: Multiple header layout options</li><li><strong>Dark Mode</strong>: Built-in dark mode support</li><li><strong>WooCommerce Compatible</strong>: Integrates with online stores</li><li><strong>RTL Support</strong>: Right-to-left language compatibility</li><li><strong>Performance Optimized</strong>: Fast loading speeds</li><li><strong>Accessibility Ready</strong>: Follows accessibility best practices</li></ul>
+<!-- /wp:list -->
 
-<p>In the next tutorial, we'll explore how to customize BuddyX to match your brand identity.</p>|$buddyx_cat_id|1"
-        
-        "Customizing BuddyX Appearance|<h2>Styling Your BuddyX-Powered Community</h2>
-<p>This tutorial walks through the process of customizing BuddyX to create a unique and branded community experience.</p>
+<!-- wp:heading {\"level\":3} -->
+<h3>BuddyX vs. Other BuddyPress Themes</h3>
+<!-- /wp:heading -->
 
-<h3>Using the WordPress Customizer</h3>
-<ol>
-<li>Go to Appearance > Customize</li>
-<li>Browse available customization sections</li>
-<li>Make changes and preview in real-time</li>
-<li>Save when satisfied with the results</li>
-</ol>
+<!-- wp:paragraph -->
+<p>Compared to other BuddyPress themes, BuddyX offers:</p>
+<!-- /wp:paragraph -->
 
-<h3>Brand Identity Elements</h3>
-<p>Establish your community's visual identity:</p>
-<ol>
-<li>Upload your logo in Site Identity</li>
-<li>Set a site icon (favicon)</li>
-<li>Configure your primary and accent colors</li>
-<li>Choose fonts that reflect your brand personality</li>
-<li>Add a custom login page background</li>
-</ol>
+<!-- wp:list -->
+<ul><li>More modern design aesthetics</li><li>Better performance metrics</li><li>More customization options</li><li>Regular updates and support</li><li>Community-focused layout decisions</li></ul>
+<!-- /wp:list -->
 
+<!-- wp:heading {\"level\":3} -->
+<h3>BuddyX Theme Structure</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>The theme organizes BuddyPress content with:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li><strong>Activity Focused Layout</strong>: Prominent activity streams</li><li><strong>Simplified Navigation</strong>: Intuitive menus and user journeys</li><li><strong>Member-Centric Design</strong>: Emphasis on user profiles and connections</li><li><strong>Group Layouts</strong>: Well-organized group pages</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Getting Started with BuddyX</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li><strong>Installation</strong>:
+<ul><li>Go to Appearance &gt; Themes &gt; Add New</li><li>Search for 'BuddyX'</li><li>Click Install and then Activate</li></ul>
+</li><li><strong>Initial Setup</strong>:
+<ul><li>Theme will prompt you to install recommended plugins</li><li>Follow the setup wizard if available</li><li>Configure basic colors and layout options</li></ul>
+</li><li><strong>BuddyPress Configuration</strong>:
+<ul><li>Ensure BuddyPress is installed and activated</li><li>Configure BuddyPress components as needed</li><li>BuddyX will automatically style these components</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>BuddyX-Specific Settings</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Find BuddyX settings in the WordPress Customizer:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul><li><strong>Site Identity</strong>: Logo, site title, favicon</li><li><strong>Colors &amp; Background</strong>: Theme color scheme</li><li><strong>Typography</strong>: Font selections and sizes</li><li><strong>Layout Options</strong>: Content width, sidebar positions</li><li><strong>Header Options</strong>: Menu positions, sticky header</li><li><strong>Footer Options</strong>: Widget areas, copyright text</li><li><strong>BuddyPress</strong>: Social network specific settings</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>In the next tutorial, we'll dive deeper into customizing the BuddyX theme to match your brand and create a unique community experience.</p>
+<!-- /wp:paragraph -->" --post_category=$buddyx_theme_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Introduction to BuddyX Theme' tutorial with ID: $buddyx_intro_id"
+
+buddyx_custom_id=$(wp post create --post_title="Customizing BuddyX Appearance" --post_name="customizing-buddyx-appearance" --post_author="1" --post_content="<!-- wp:heading -->
+<h2>Customizing BuddyX Appearance</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>The BuddyX theme offers extensive customization options that allow you to create a unique look for your BuddyPress community. This tutorial guides you through personalizing your site's appearance without coding.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Accessing the Customizer</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Log in to your WordPress admin area</li><li>Go to Appearance &gt; Customize</li><li>The live customizer will open with a preview panel and control panel</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Site Identity Settings</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Start with the basics:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to 'Site Identity'</li><li>Upload your site logo (recommended size: 180×50px)</li><li>Set a site title and tagline</li><li>Upload a site icon (favicon)</li><li>Click 'Publish' to save changes</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Color Scheme Customization</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyX allows extensive color customization:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to 'Colors &amp; Background'</li><li>Customize:
+<ul><li><strong>Primary Color</strong>: Main accent color throughout the site</li><li><strong>Text Color</strong>: Default text color</li><li><strong>Link Color</strong>: Color for hyperlinks</li><li><strong>Link Hover Color</strong>: Color when hovering over links</li><li><strong>Background Color</strong>: Site background</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Typography Settings</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Personalize your fonts:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to 'Typography'</li><li>Customize:
+<ul><li><strong>Base Typography</strong>: Font family, size, weight, etc.</li><li><strong>Headings</strong>: Font settings for H1-H6 elements</li><li><strong>Menu</strong>: Font settings for navigation items</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>BuddyX includes Google Fonts integration, giving you access to hundreds of font options.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Layout Customization</h3>
-<ul>
-<li>Container width for content areas</li>
-<li>Sidebar positioning (left, right, none)</li>
-<li>Page header styles</li>
-<li>Content spacing adjustments</li>
-<li>Archive and blog layout options</li>
-</ul>
+<!-- /wp:heading -->
 
-<h3>Header and Navigation Options</h3>
-<ol>
-<li>Select header layout style:
-  <ul>
-    <li>Standard header</li>
-    <li>Community header (with BuddyPress menus)</li>
-    <li>Fixed header for easy navigation</li>
-  </ul>
-</li>
-<li>Configure menu positions</li>
-<li>Set up mobile navigation options</li>
-<li>Customize login/register buttons</li>
-</ol>
+<!-- wp:paragraph -->
+<p>Adjust your site structure:</p>
+<!-- /wp:paragraph -->
 
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to 'Layout Options'</li><li>Configure:
+<ul><li><strong>Container Width</strong>: Overall site width</li><li><strong>Sidebar Layout</strong>: Left, right, or no sidebar</li><li><strong>Archive Layout</strong>: How post lists display</li><li><strong>Content Layout</strong>: Full width or boxed</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Header Options</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Customize your site header:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to 'Header Options'</li><li>Adjust:
+<ul><li><strong>Header Layout</strong>: Choose from multiple header styles</li><li><strong>Sticky Header</strong>: Enable/disable header sticking to top</li><li><strong>Header Elements</strong>: Search, cart, buttons, etc.</li><li><strong>Mobile Menu Settings</strong>: Mobile menu behavior</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>BuddyPress-Specific Styling</h3>
-<p>Enhance your community areas:</p>
-<ul>
-<li>Activity stream layout and design</li>
-<li>Member directory appearance</li>
-<li>Group directory and single group pages</li>
-<li>Profile tabs and layout</li>
-<li>Message system styling</li>
-</ul>
+<!-- /wp:heading -->
 
-<h3>Advanced Customization</h3>
-<p>For deeper customization:</p>
-<ol>
-<li>Use the Additional CSS section in Customizer</li>
-<li>Create a child theme for code modifications</li>
-<li>Utilize theme hooks for PHP customizations</li>
-<li>Consider custom page templates for special sections</li>
-</ol>
+<!-- wp:paragraph -->
+<p>Fine-tune BuddyPress elements:</p>
+<!-- /wp:paragraph -->
 
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Go to 'BuddyPress' section</li><li>Customize:
+<ul><li><strong>Profile Settings</strong>: Avatar size, cover image dimensions</li><li><strong>Member Directory</strong>: Layout and display options</li><li><strong>Group Directory</strong>: Layout and display options</li><li><strong>Activity Stream</strong>: Post form position, comment display</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Adding Custom CSS</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>For advanced customization:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Navigate to 'Additional CSS'</li><li>Enter custom CSS rules</li><li>See live preview of changes</li><li>Click 'Publish' to save</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Creating Child Themes for Major Customizations</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>For extensive modifications:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Create a BuddyX child theme</li><li>Modify template files as needed</li><li>Add custom functions to the child theme's functions.php</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Using Page Templates</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyX includes several page templates:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Edit a page</li><li>In the right sidebar, find 'Page Attributes'</li><li>Select a template from the dropdown:
+<ul><li>Full Width</li><li>Full Width Container</li><li>Left Sidebar</li><li>Right Sidebar</li><li>Both Sidebars</li></ul>
+</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
 <h3>Mobile Responsiveness</h3>
-<ul>
-<li>Preview your site in mobile view within Customizer</li>
-<li>Ensure menus collapse properly on small screens</li>
-<li>Check readability of text at all screen sizes</li>
-<li>Verify touch targets are large enough for mobile users</li>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>BuddyX is mobile-first, but you can fine-tune:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list {\"ordered\":true} -->
+<ol><li>Use the Customizer's responsive preview buttons</li><li>Check all layouts on phone, tablet, and desktop views</li><li>Adjust settings that affect mobile display</li></ol>
+<!-- /wp:list -->
+
+<!-- wp:heading {\"level\":3} -->
+<h3>Best Practices</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul><li>Maintain consistent colors aligned with your brand</li><li>Use no more than 2-3 font families</li><li>Test customizations on multiple devices</li><li>Keep your design clean and uncluttered</li><li>Consider accessibility when choosing colors and fonts</li></ul>
+<!-- /wp:list -->
+
+<!-- wp:paragraph -->
+<p>In the next tutorial, we'll cover BuddyX performance optimization to ensure your community site runs smoothly and loads quickly.</p>
+<!-- /wp:paragraph -->" --post_category=$buddyx_theme_id --post_status=publish --porcelain --path=/var/www/html)
+echo "Created 'Customizing BuddyX Appearance' tutorial with ID: $buddyx_custom_id"
+
+# Check permalink structure is set properly
+current_permalink=$(wp option get permalink_structure --path=/var/www/html)
+if [ -z "$current_permalink" ]; then
+    echo "Setting permalink structure..."
+    wp option update permalink_structure '/%postname%/' --path=/var/www/html
+    wp rewrite flush --path=/var/www/html
+fi
+
+# Create curriculum page with simple links that will work better with pretty permalinks
+echo "Creating Tutorial Course Curriculum page..."
+wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post_name="tutorial-course-curriculum" --post_status=publish --path=/var/www/html --post_content="<h3>BuddyPress &amp; BuddyX Social Network Tutorial Series</h3>
+
+<p>Welcome to our comprehensive tutorial series on building social networks with WordPress, BuddyPress, and the BuddyX theme.</p>
+
+<h4>Getting Started with BuddyPress</h4>
+<ul style='list-style-type: none; padding-left: 15px;'>
+  <li style='margin-bottom: 10px;'><a href=\"/introduction-to-buddypress/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Introduction to BuddyPress</a></li>
+  <li style='margin-bottom: 10px;'><a href=\"/installing-and-configuring-buddypress/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Installing and Configuring BuddyPress</a></li>
+  <li style='margin-bottom: 10px;'><a href=\"/customizing-member-profiles/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Customizing Member Profiles</a></li>
 </ul>
 
-<p>In the next tutorial, we'll explore BuddyX's performance optimization features.</p>|$buddyx_cat_id|2"
-        
-        "BuddyX Performance Optimization|<h2>Speeding Up Your BuddyX Community</h2>
-<p>This tutorial explains how to optimize the performance of your BuddyX-powered BuddyPress community for a faster, smoother user experience.</p>
-
-<h3>Why Performance Matters</h3>
-<p>Fast-loading communities provide several benefits:</p>
-<ul>
-<li>Improved user satisfaction and engagement</li>
-<li>Higher retention rates</li>
-<li>Better search engine rankings</li>
-<li>Reduced server load and costs</li>
-<li>Better mobile experience</li>
+<h4>Group Management</h4>
+<ul style='list-style-type: none; padding-left: 15px;'>
+  <li style='margin-bottom: 10px;'><a href=\"/creating-and-managing-groups/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Creating and Managing Groups</a></li>
+  <li style='margin-bottom: 10px;'><a href=\"/setting-up-group-discussions/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Setting Up Group Discussions</a></li>
 </ul>
 
-<h3>BuddyX Performance Features</h3>
-<p>The theme includes several optimization features:</p>
-<ol>
-<li>Lightweight code structure</li>
-<li>Optimized CSS and JavaScript loading</li>
-<li>Selective component loading</li>
-<li>Efficient template system</li>
-<li>Pagination options to reduce initial load</li>
-</ol>
-
-<h3>Optimizing Images</h3>
-<ul>
-<li>Configure image sizes in BuddyX settings</li>
-<li>Use appropriate image compression</li>
-<li>Implement lazy loading for activity stream images</li>
-<li>Consider WebP format for better compression</li>
-<li>Set reasonable limits for user uploads</li>
+<h4>BuddyX Theme</h4>
+<ul style='list-style-type: none; padding-left: 15px;'>
+  <li style='margin-bottom: 10px;'><a href=\"/introduction-to-buddyx-theme/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Introduction to BuddyX Theme</a></li>
+  <li style='margin-bottom: 10px;'><a href=\"/customizing-buddyx-appearance/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Customizing BuddyX Appearance</a></li>
 </ul>
 
-<h3>Caching Configuration</h3>
-<ol>
-<li>Enable compatible caching plugins</li>
-<li>Configure BuddyPress-specific cache settings</li>
-<li>Use object caching if available on your host</li>
-<li>Implement browser caching for static assets</li>
-<li>Configure exclusions for dynamic community content</li>
-</ol>
+<h4>Additional Resources</h4>
+<ul style='list-style-type: none; padding-left: 15px;'>
+  <li style='margin-bottom: 10px;'><a href=\"https://codex.buddypress.org/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>BuddyPress Codex</a></li>
+  <li style='margin-bottom: 10px;'><a href=\"https://wordpress.org/plugins/buddypress/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>BuddyPress Plugin Page</a></li>
+  <li style='margin-bottom: 10px;'><a href=\"https://wbcomdesigns.com/docs/buddyx-theme-documentation/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>BuddyX Theme Documentation</a></li>
+</ul>"
 
-<h3>Database Optimization</h3>
-<ul>
-<li>Regular database cleanup for BuddyPress tables</li>
-<li>Optimize activity and notification tables</li>
-<li>Consider external object cache for query results</li>
-<li>Implement efficient queries for custom functionality</li>
-</ul>
-
-<h3>Content Delivery and Hosting</h3>
-<ol>
-<li>Use a CDN for static assets</li>
-<li>Choose hosting optimized for WordPress and BuddyPress</li>
-<li>Consider dedicated hosting for larger communities</li>
-<li>Implement GZIP compression</li>
-<li>Use HTTP/2 or HTTP/3 if available</li>
-</ol>
-
-<h3>Measuring Performance</h3>
-<ul>
-<li>Use tools like GTmetrix or PageSpeed Insights</li>
-<li>Monitor real user metrics</li>
-<li>Set up performance budgets</li>
-<li>Regular testing across devices</li>
-<li>A/B test performance optimizations</li>
-</ul>
-
-<p>In the next tutorial, we'll explore how to extend BuddyX with custom functionality.</p>|$buddyx_cat_id|3"
-    )
-    
-    # Function to create tutorial posts
-    create_tutorial_post() {
-        local data="$1"
-        
-        # Split the data into variables
-        IFS='|' read -r title content category_id order <<< "$data"
-        
-        # Select a random user as the author (excluding admin)
-        author_id=$((RANDOM % 10 + 2))
-        if ! wp user get $author_id --path=/var/www/html &>/dev/null; then
-            author_id=1
-        fi
-        
-        # Get author name for display in post content
-        author_name=$(wp user get $author_id --field=display_name --path=/var/www/html)
-        
-        # Add author attribution to content
-        content+="<p class=\"author-attribution\"><em>Written by $author_name</em></p>"
-        
-        # Create the post
-        post_id=$(wp post create --post_title="$title" --post_content="$content" --post_status="publish" --post_type="post" --post_author="$author_id" --porcelain --path=/var/www/html)
-        
-        # Assign the category after creation to avoid issues
-        wp post term add "$post_id" category "$category_id" --path=/var/www/html
-        
-        # Set menu order for proper sorting
-        wp post update "$post_id" --menu_order="$order" --path=/var/www/html
-        
-        echo "Created tutorial post ID: $post_id - $title (by $author_name)"
-    }
-    
-    echo "Creating BuddyPress basics tutorials..."
-    for tutorial in "${basics_tutorials[@]}"; do
-        create_tutorial_post "$tutorial"
-    done
-    
-    echo "Creating group management tutorials..."
-    for tutorial in "${groups_tutorials[@]}"; do
-        create_tutorial_post "$tutorial"
-    done
-    
-    echo "Creating member management tutorials..."
-    for tutorial in "${members_tutorials[@]}"; do
-        create_tutorial_post "$tutorial"
-    done
-    
-    echo "Creating activity stream tutorials..."
-    for tutorial in "${activity_tutorials[@]}"; do
-        create_tutorial_post "$tutorial"
-    done
-    
-    echo "Creating BuddyX theme tutorials..."
-    for tutorial in "${buddyx_tutorials[@]}"; do
-        create_tutorial_post "$tutorial"
-    done
-    
-    # Create a course curriculum page that lists and links to all tutorials
-    echo "Creating course curriculum page..."
-    
-    curriculum_content="<h1>BuddyPress & BuddyX Social Network Tutorial Series</h1>
-<p>Welcome to our comprehensive tutorial series on building social networks with WordPress, BuddyPress, and the BuddyX theme. This curriculum will guide you through everything you need to know to create and manage a thriving online community.</p>
-
-<h2>Getting Started with BuddyPress</h2>
-<ul>"
-
-    # Add basics tutorials
-    for tutorial in "${basics_tutorials[@]}"; do
-        IFS='|' read -r title content category_id order <<< "$tutorial"
-        # Get the post ID more reliably by title
-        post_id=$(wp post list --post_type=post --post_status=publish --title="$title" --field=ID --path=/var/www/html)
-        if [ -n "$post_id" ]; then
-            curriculum_content+="<li><a href=\"$(wp post get $post_id --field=guid --path=/var/www/html)\">$title</a></li>"
-        else
-            curriculum_content+="<li>$title</li>"
-        fi
-    done
-
-    curriculum_content+="</ul>
-
-<h2>Group Management</h2>
-<ul>"
-
-    # Add group management tutorials
-    for tutorial in "${groups_tutorials[@]}"; do
-        IFS='|' read -r title content category_id order <<< "$tutorial"
-        # Get the post ID more reliably by title
-        post_id=$(wp post list --post_type=post --post_status=publish --title="$title" --field=ID --path=/var/www/html)
-        if [ -n "$post_id" ]; then
-            curriculum_content+="<li><a href=\"$(wp post get $post_id --field=guid --path=/var/www/html)\">$title</a></li>"
-        else
-            curriculum_content+="<li>$title</li>"
-        fi
-    done
-
-    curriculum_content+="</ul>
-
-<h2>Member Management</h2>
-<ul>"
-
-    # Add member management tutorials
-    for tutorial in "${members_tutorials[@]}"; do
-        IFS='|' read -r title content category_id order <<< "$tutorial"
-        # Get the post ID more reliably by title
-        post_id=$(wp post list --post_type=post --post_status=publish --title="$title" --field=ID --path=/var/www/html)
-        if [ -n "$post_id" ]; then
-            curriculum_content+="<li><a href=\"$(wp post get $post_id --field=guid --path=/var/www/html)\">$title</a></li>"
-        else
-            curriculum_content+="<li>$title</li>"
-        fi
-    done
-
-    curriculum_content+="</ul>
-
-<h2>Activity Streams</h2>
-<ul>"
-
-    # Add activity stream tutorials
-    for tutorial in "${activity_tutorials[@]}"; do
-        IFS='|' read -r title content category_id order <<< "$tutorial"
-        # Get the post ID more reliably by title
-        post_id=$(wp post list --post_type=post --post_status=publish --title="$title" --field=ID --path=/var/www/html)
-        if [ -n "$post_id" ]; then
-            curriculum_content+="<li><a href=\"$(wp post get $post_id --field=guid --path=/var/www/html)\">$title</a></li>"
-        else
-            curriculum_content+="<li>$title</li>"
-        fi
-    done
-
-    curriculum_content+="</ul>
-
-<h2>BuddyX Theme</h2>
-<ul>"
-
-    # Add BuddyX theme tutorials
-    for tutorial in "${buddyx_tutorials[@]}"; do
-        IFS='|' read -r title content category_id order <<< "$tutorial"
-        # Get the post ID more reliably by title
-        post_id=$(wp post list --post_type=post --post_status=publish --title="$title" --field=ID --path=/var/www/html)
-        if [ -n "$post_id" ]; then
-            curriculum_content+="<li><a href=\"$(wp post get $post_id --field=guid --path=/var/www/html)\">$title</a></li>"
-        else
-            curriculum_content+="<li>$title</li>"
-        fi
-    done
-
-    curriculum_content+="</ul>
-
-<h2>Additional Resources</h2>
-<ul>
-<li><a href=\"https://codex.buddypress.org/\" target=\"_blank\">BuddyPress Codex</a></li>
-<li><a href=\"https://wordpress.org/plugins/buddypress/\" target=\"_blank\">BuddyPress Plugin Page</a></li>
-<li><a href=\"https://wbcomdesigns.com/downloads/buddyx-theme/\" target=\"_blank\">BuddyX Theme Documentation</a></li>
-</ul>
-
-<p>This course curriculum is designed to be followed sequentially, but feel free to jump to specific tutorials that address your immediate needs. Happy community building!</p>"
-
-    # Create the curriculum page
-    curriculum_page_id=$(wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post_content="$curriculum_content" --post_status="publish" --path=/var/www/html --porcelain)
-    
-    echo "Created tutorial curriculum page with ID: $curriculum_page_id"
-    
-    # Add the curriculum page to the main menu if menus exist
-    if wp menu list --path=/var/www/html &>/dev/null; then
-        main_menu=$(wp menu list --format=ids --path=/var/www/html | head -n1)
-        if [ -n "$main_menu" ]; then
-            wp menu item add-post $main_menu $curriculum_page_id --path=/var/www/html
-            echo "Added curriculum page to main menu"
-        fi
-    fi
-# endregion: TUTORIAL CONTENT
+echo "Tutorial content for BuddyPress and BuddyX created successfully!"
+# endregion: TUTORIAL CONTENT CREATION
 
 echo "Data population completed!"

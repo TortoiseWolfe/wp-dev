@@ -52,6 +52,11 @@ wp plugin activate buddypress --path=/var/www/html || handle_error $LINENO
 echo "Activating BuddyX theme..."
 wp theme activate buddyx --path=/var/www/html || handle_error $LINENO
 
+# Set permalink structure
+echo "Setting permalink structure..."
+wp option update permalink_structure '/%postname%/' --path=/var/www/html
+wp rewrite flush --path=/var/www/html
+
 # Enable BuddyPress components one by one with error handling
 echo "Enabling BuddyPress components..."
 # This activates all components in a safer way
