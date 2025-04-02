@@ -1,0 +1,173 @@
+/**
+ * Simple BuddyPress Tutorial Gamification Styles
+ */
+
+/* Progress Bar */
+.tutorial-progress-container {
+    background-color: #eee;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.tutorial-progress-bar {
+    background-color: #0073aa;
+    height: 100%;
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+/* Tutorial Links */
+.tutorial-link {
+    text-decoration: none;
+    padding: 8px 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    color: #0073aa;
+    font-weight: 500;
+    border-left: 4px solid #0073aa;
+    display: inline-block;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.tutorial-link.completed {
+    border-left-color: #4caf50;
+}
+
+.tutorial-checkmark {
+    color: #4caf50;
+    margin-right: 5px;
+}
+
+/* Tutorial Completion Box */
+.tutorial-completion-box {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    margin-top: 40px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.tutorial-completion-box.completed {
+    border-left: 4px solid #4caf50;
+}
+
+/* Completed Message */
+.completed-message {
+    background-color: #e8f5e9;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+    border-left: 4px solid #4caf50;
+}
+
+.completed-icon {
+    background-color: #4caf50;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 10px;
+}
+
+/* Buttons */
+.mark-complete-button {
+    background-color: #4caf50;
+    color: white;
+    padding: 12px 25px;
+    border-radius: 4px;
+    border: none;
+    font-weight: 500;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.mark-complete-button:hover {
+    background-color: #388e3c;
+}
+
+.next-tutorial-button {
+    text-decoration: none;
+    background-color: #ff9800;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    display: inline-block;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+}
+
+.next-tutorial-button:hover {
+    background-color: #f57c00;
+}
+
+.reset-progress-button {
+    background-color: #f44336;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.reset-progress-button:hover {
+    background-color: #d32f2f;
+}
+
+/* Achievements */
+.achievement {
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    border-left: 4px solid;
+    transition: all 0.3s ease;
+}
+
+.achievement.unlocked {
+    background-color: #fff9c4;
+    border-left-color: #ffc107;
+}
+
+.achievement.unlocked h4 {
+    color: #ff9800;
+}
+
+.achievement.locked {
+    background-color: #f5f5f5;
+    border-left-color: #9e9e9e;
+}
+
+.achievement.locked h4 {
+    color: #616161;
+}
+
+/* Notification */
+.tutorial-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #4caf50;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 4px;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.tutorial-notification.visible {
+    opacity: 1;
+    transform: translateY(0);
+}

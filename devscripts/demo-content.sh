@@ -570,11 +570,19 @@ echo "Created 'Activity Streams' subcategory with ID: $activity_streams_id"
 buddyx_theme_id=$(wp term create category "BuddyX Theme" --slug="buddyx-theme" --parent=$main_cat_id --porcelain --path=/var/www/html)
 echo "Created 'BuddyX Theme' subcategory with ID: $buddyx_theme_id"
 
+# IMPORTANT: Use plugin-based gamification system ONLY - do not add gamification code directly to posts
+echo "Preparing to create tutorial content (gamification will be handled by plugin only)..."
+
+# Remove any gamification variables that would cause duplication
+TUTORIAL_GAMIFICATION_HEADER=""
+TUTORIAL_GAMIFICATION_FOOTER=""
+INCOMPLETE_TUTORIAL_FOOTER=""
+
 # Create tutorial posts
-echo "Creating tutorial posts..."
+echo "Creating tutorial posts with gamification elements..."
 
 # Getting Started tutorials
-intro_bp_id=$(wp post create --post_title="Introduction to BuddyPress" --post_name="introduction-to-buddypress" --post_author="1" --post_content="<h2>Introduction to BuddyPress</h2>
+intro_bp_id=$(wp post create --post_title="Introduction to BuddyPress" --post_name="introduction-to-buddypress" --post_author="1" --post_date="2025-03-26 10:00:00" --post_content="<h2>Introduction to BuddyPress</h2>
 
 <p>BuddyPress is a powerful plugin that transforms your WordPress site into a full-featured social network. It allows your users to connect with each other, create groups, post status updates, and much more.</p>
 
@@ -618,10 +626,13 @@ intro_bp_id=$(wp post create --post_title="Introduction to BuddyPress" --post_na
 <li><strong>Blogs</strong>: Multi-site blog tracking (for WordPress Multisite)</li>
 </ol>
 
-<p>In the next tutorial, we'll cover how to install and configure BuddyPress on your WordPress site.</p>" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
+<p>In the next tutorial, we'll cover how to install and configure BuddyPress on your WordPress site.</p>
+
+<!-- data-tutorial-slug=\"introduction-to-buddypress\" data-next-tutorial=\"installing-and-configuring-buddypress\" -->" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Introduction to BuddyPress' tutorial with ID: $intro_bp_id"
 
-install_bp_id=$(wp post create --post_title="Installing and Configuring BuddyPress" --post_name="installing-and-configuring-buddypress" --post_author="1" --post_content="<h2>Installing and Configuring BuddyPress</h2>
+install_bp_id=$(wp post create --post_title="Installing and Configuring BuddyPress" --post_name="installing-and-configuring-buddypress" --post_author="1" --post_date="2025-03-27 10:15:00" --post_content="
+<h2>Installing and Configuring BuddyPress</h2>
 
 <p>This tutorial guides you through the process of adding BuddyPress to your WordPress site and configuring its essential settings.</p>
 
@@ -730,10 +741,13 @@ install_bp_id=$(wp post create --post_title="Installing and Configuring BuddyPre
 
 <!-- wp:paragraph -->
 <p>In the next tutorial, we'll explore how to customize member profiles to create a personalized experience for your community members.</p>
-<!-- /wp:paragraph -->" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
+<!-- /wp:paragraph -->
+
+<!-- data-tutorial-slug=\"installing-and-configuring-buddypress\" data-next-tutorial=\"customizing-member-profiles\" -->" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Installing and Configuring BuddyPress' tutorial with ID: $install_bp_id"
 
-profiles_bp_id=$(wp post create --post_title="Customizing Member Profiles" --post_name="customizing-member-profiles" --post_author="1" --post_content="<!-- wp:heading -->
+profiles_bp_id=$(wp post create --post_title="Customizing Member Profiles" --post_name="customizing-member-profiles" --post_author="1" --post_date="2025-03-28 09:45:00" --post_content="
+<!-- wp:heading -->
 <h2>Customizing Member Profiles in BuddyPress</h2>
 <!-- /wp:heading -->
 
@@ -865,11 +879,13 @@ profiles_bp_id=$(wp post create --post_title="Customizing Member Profiles" --pos
 
 <!-- wp:paragraph -->
 <p>In the next tutorial, we'll cover the BuddyPress interface and how users can navigate through your social network.</p>
-<!-- /wp:paragraph -->" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
+<!-- /wp:paragraph -->
+
+${TUTORIAL_GAMIFICATION_FOOTER/NEXT_TUTORIAL/creating-and-managing-groups}" --post_category=$getting_started_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Customizing Member Profiles' tutorial with ID: $profiles_bp_id"
 
 # Group Management tutorial
-groups_bp_id=$(wp post create --post_title="Creating and Managing Groups" --post_name="creating-and-managing-groups" --post_author="1" --post_content="<!-- wp:heading -->
+groups_bp_id=$(wp post create --post_title="Creating and Managing Groups" --post_name="creating-and-managing-groups" --post_author="1" --post_date="2025-03-29 11:30:00" --post_content="<!-- wp:heading -->
 <h2>Creating and Managing Groups in BuddyPress</h2>
 <!-- /wp:heading -->
 
@@ -985,10 +1001,13 @@ groups_bp_id=$(wp post create --post_title="Creating and Managing Groups" --post
 
 <!-- wp:paragraph -->
 <p>In the next tutorial, we'll cover setting up group discussions to facilitate engagement within your community groups.</p>
-<!-- /wp:paragraph -->" --post_category=$group_management_id --post_status=publish --porcelain --path=/var/www/html)
+<!-- /wp:paragraph -->
+
+<!-- data-tutorial-slug=\"creating-and-managing-groups\" data-next-tutorial=\"setting-up-group-discussions\" -->" --post_category=$group_management_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Creating and Managing Groups' tutorial with ID: $groups_bp_id"
 
-discussions_bp_id=$(wp post create --post_title="Setting Up Group Discussions" --post_name="setting-up-group-discussions" --post_author="1" --post_content="<!-- wp:heading -->
+discussions_bp_id=$(wp post create --post_title="Setting Up Group Discussions" --post_name="setting-up-group-discussions" --post_author="1" --post_date="2025-03-30 14:20:00" --post_content="${TUTORIAL_GAMIFICATION_HEADER}
+<!-- wp:heading -->
 <h2>Setting Up Group Discussions in BuddyPress</h2>
 <!-- /wp:heading -->
 
@@ -1120,11 +1139,14 @@ discussions_bp_id=$(wp post create --post_title="Setting Up Group Discussions" -
 
 <!-- wp:paragraph -->
 <p>In the next tutorial, we'll explore organizing group events to further engage your community members.</p>
-<!-- /wp:paragraph -->" --post_category=$group_management_id --post_status=publish --porcelain --path=/var/www/html)
+<!-- /wp:paragraph -->
+
+${INCOMPLETE_TUTORIAL_FOOTER}" --post_category=$group_management_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Setting Up Group Discussions' tutorial with ID: $discussions_bp_id"
 
 # BuddyX Theme tutorial
-buddyx_intro_id=$(wp post create --post_title="Introduction to BuddyX Theme" --post_name="introduction-to-buddyx-theme" --post_author="1" --post_content="<!-- wp:heading -->
+buddyx_intro_id=$(wp post create --post_title="Introduction to BuddyX Theme" --post_name="introduction-to-buddyx-theme" --post_author="1" --post_date="2025-03-31 08:45:00" --post_content="${TUTORIAL_GAMIFICATION_HEADER}
+<!-- wp:heading -->
 <h2>Introduction to BuddyX Theme</h2>
 <!-- /wp:heading -->
 
@@ -1200,10 +1222,13 @@ buddyx_intro_id=$(wp post create --post_title="Introduction to BuddyX Theme" --p
 
 <!-- wp:paragraph -->
 <p>In the next tutorial, we'll dive deeper into customizing the BuddyX theme to match your brand and create a unique community experience.</p>
-<!-- /wp:paragraph -->" --post_category=$buddyx_theme_id --post_status=publish --porcelain --path=/var/www/html)
+<!-- /wp:paragraph -->
+
+${TUTORIAL_GAMIFICATION_FOOTER/NEXT_TUTORIAL/customizing-buddyx-appearance}" --post_category=$buddyx_theme_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Introduction to BuddyX Theme' tutorial with ID: $buddyx_intro_id"
 
-buddyx_custom_id=$(wp post create --post_title="Customizing BuddyX Appearance" --post_name="customizing-buddyx-appearance" --post_author="1" --post_content="<!-- wp:heading -->
+buddyx_custom_id=$(wp post create --post_title="Customizing BuddyX Appearance" --post_name="customizing-buddyx-appearance" --post_author="1" --post_date="2025-04-01 09:30:00" --post_content="${TUTORIAL_GAMIFICATION_HEADER}
+<!-- wp:heading -->
 <h2>Customizing BuddyX Appearance</h2>
 <!-- /wp:heading -->
 
@@ -1365,7 +1390,9 @@ buddyx_custom_id=$(wp post create --post_title="Customizing BuddyX Appearance" -
 
 <!-- wp:paragraph -->
 <p>In the next tutorial, we'll cover BuddyX performance optimization to ensure your community site runs smoothly and loads quickly.</p>
-<!-- /wp:paragraph -->" --post_category=$buddyx_theme_id --post_status=publish --porcelain --path=/var/www/html)
+<!-- /wp:paragraph -->
+
+${INCOMPLETE_TUTORIAL_FOOTER}" --post_category=$buddyx_theme_id --post_status=publish --porcelain --path=/var/www/html)
 echo "Created 'Customizing BuddyX Appearance' tutorial with ID: $buddyx_custom_id"
 
 # Check permalink structure is set properly
@@ -1376,39 +1403,95 @@ if [ -z "$current_permalink" ]; then
     wp rewrite flush --path=/var/www/html
 fi
 
-# Create curriculum page with simple links that will work better with pretty permalinks
-echo "Creating Tutorial Course Curriculum page..."
-wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post_name="tutorial-course-curriculum" --post_status=publish --path=/var/www/html --post_content="<h3>BuddyPress &amp; BuddyX Social Network Tutorial Series</h3>
+# Create gamification plugin for WordPress
+echo "Setting up functional gamification system..."
+mkdir -p /var/www/html/wp-content/plugins/simple-tutorial-gamification/assets
+
+# Copy the plugin files
+cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-tutorial-gamification/simple-tutorial-gamification.php
+cp /usr/local/bin/devscripts/simple-gamification.js /var/www/html/wp-content/plugins/simple-tutorial-gamification/assets/simple-gamification.js
+cp /usr/local/bin/devscripts/simple-gamification.css /var/www/html/wp-content/plugins/simple-tutorial-gamification/assets/simple-gamification.css
+
+# Activate the plugin
+wp plugin activate simple-tutorial-gamification --path=/var/www/html || echo "Failed to activate plugin, will be activated on next page load"
+
+# Create curriculum page with interactive gamification
+echo "Creating Tutorial Course Curriculum page with interactive gamification elements..."
+
+wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post_name="tutorial-course-curriculum" --post_date="2025-03-25 15:30:00" --post_status=publish --path=/var/www/html --post_content="<h3>BuddyPress &amp; BuddyX Social Network Tutorial Series</h3>
 
 <p>Welcome to our comprehensive tutorial series on building social networks with WordPress, BuddyPress, and the BuddyX theme.</p>
 
 <h4>Getting Started with BuddyPress</h4>
-<ul style='list-style-type: none; padding-left: 15px;'>
-  <li style='margin-bottom: 10px;'><a href=\"/introduction-to-buddypress/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Introduction to BuddyPress</a></li>
-  <li style='margin-bottom: 10px;'><a href=\"/installing-and-configuring-buddypress/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Installing and Configuring BuddyPress</a></li>
-  <li style='margin-bottom: 10px;'><a href=\"/customizing-member-profiles/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Customizing Member Profiles</a></li>
+<ul style=\"list-style-type: none; padding-left: 15px;\">
+  <li style=\"margin-bottom: 10px;\"><a href=\"/introduction-to-buddypress/\" class=\"tutorial-link\" data-tutorial-slug=\"introduction-to-buddypress\">Introduction to BuddyPress</a></li>
+  <li style=\"margin-bottom: 10px;\"><a href=\"/installing-and-configuring-buddypress/\" class=\"tutorial-link\" data-tutorial-slug=\"installing-and-configuring-buddypress\">Installing and Configuring BuddyPress</a></li>
+  <li style=\"margin-bottom: 10px;\"><a href=\"/customizing-member-profiles/\" class=\"tutorial-link\" data-tutorial-slug=\"customizing-member-profiles\">Customizing Member Profiles</a></li>
 </ul>
 
 <h4>Group Management</h4>
-<ul style='list-style-type: none; padding-left: 15px;'>
-  <li style='margin-bottom: 10px;'><a href=\"/creating-and-managing-groups/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Creating and Managing Groups</a></li>
-  <li style='margin-bottom: 10px;'><a href=\"/setting-up-group-discussions/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Setting Up Group Discussions</a></li>
+<ul style=\"list-style-type: none; padding-left: 15px;\">
+  <li style=\"margin-bottom: 10px;\"><a href=\"/creating-and-managing-groups/\" class=\"tutorial-link\" data-tutorial-slug=\"creating-and-managing-groups\">Creating and Managing Groups</a></li>
+  <li style=\"margin-bottom: 10px;\"><a href=\"/setting-up-group-discussions/\" class=\"tutorial-link\" data-tutorial-slug=\"setting-up-group-discussions\">Setting Up Group Discussions</a></li>
 </ul>
 
 <h4>BuddyX Theme</h4>
-<ul style='list-style-type: none; padding-left: 15px;'>
-  <li style='margin-bottom: 10px;'><a href=\"/introduction-to-buddyx-theme/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Introduction to BuddyX Theme</a></li>
-  <li style='margin-bottom: 10px;'><a href=\"/customizing-buddyx-appearance/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>Customizing BuddyX Appearance</a></li>
+<ul style=\"list-style-type: none; padding-left: 15px;\">
+  <li style=\"margin-bottom: 10px;\"><a href=\"/introduction-to-buddyx-theme/\" class=\"tutorial-link\" data-tutorial-slug=\"introduction-to-buddyx-theme\">Introduction to BuddyX Theme</a></li>
+  <li style=\"margin-bottom: 10px;\"><a href=\"/customizing-buddyx-appearance/\" class=\"tutorial-link\" data-tutorial-slug=\"customizing-buddyx-appearance\">Customizing BuddyX Appearance</a></li>
 </ul>
 
 <h4>Additional Resources</h4>
-<ul style='list-style-type: none; padding-left: 15px;'>
-  <li style='margin-bottom: 10px;'><a href=\"https://codex.buddypress.org/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>BuddyPress Codex</a></li>
-  <li style='margin-bottom: 10px;'><a href=\"https://wordpress.org/plugins/buddypress/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>BuddyPress Plugin Page</a></li>
-  <li style='margin-bottom: 10px;'><a href=\"https://wbcomdesigns.com/docs/buddyx-theme-documentation/\" style='text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;'>BuddyX Theme Documentation</a></li>
-</ul>"
+<ul style=\"list-style-type: none; padding-left: 15px;\">
+  <li style=\"margin-bottom: 10px;\"><a href=\"https://codex.buddypress.org/\" style=\"text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;\">BuddyPress Codex</a></li>
+  <li style=\"margin-bottom: 10px;\"><a href=\"https://wordpress.org/plugins/buddypress/\" style=\"text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;\">BuddyPress Plugin Page</a></li>
+  <li style=\"margin-bottom: 10px;\"><a href=\"https://wbcomdesigns.com/docs/buddyx-theme-documentation/\" style=\"text-decoration: none; padding: 8px 15px; background-color: #f8f9fa; border-radius: 4px; color: #0073aa; font-weight: 500; border-left: 4px solid #0073aa; display: inline-block;\">BuddyX Theme Documentation</a></li>
+</ul>
+
+<!-- GAMIFICATION: Achievement notifications -->
+<div id=\"achievements-section\" style=\"margin-top: 30px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; background-color: #fafafa;\">
+    <h3 style=\"border-bottom: 1px solid #e0e0e0; padding-bottom: 10px; margin-top: 0;\">Your Achievements</h3>
+    
+    <div class=\"achievement achievement-getting-started locked\">
+        <h4 style=\"margin-top: 0;\">🏆 Achievement: Getting Started Master</h4>
+        <p style=\"margin-bottom: 0;\">Complete all tutorials in the Getting Started section to earn +150 bonus points!</p>
+    </div>
+    
+    <div class=\"achievement achievement-group-manager locked\">
+        <h4 style=\"margin-top: 0;\">🏆 Achievement: Group Manager</h4>
+        <p style=\"margin-bottom: 0;\">Complete the Creating and Managing Groups tutorial.</p>
+    </div>
+    
+    <div class=\"achievement achievement-theme-explorer locked\">
+        <h4 style=\"margin-top: 0;\">🏆 Achievement: Theme Explorer</h4>
+        <p style=\"margin-bottom: 0;\">Complete the Introduction to BuddyX Theme tutorial.</p>
+    </div>
+    
+    <div class=\"achievement achievement-discussion-master locked\">
+        <h4 style=\"margin-top: 0;\">🏆 Achievement: Discussion Master</h4>
+        <p style=\"margin-bottom: 0;\">Complete the Setting Up Group Discussions tutorial.</p>
+    </div>
+    
+    <div class=\"achievement achievement-theme-customizer locked\">
+        <h4 style=\"margin-top: 0;\">🏆 Achievement: Theme Customizer</h4>
+        <p style=\"margin-bottom: 0;\">Complete the Customizing BuddyX Appearance tutorial.</p>
+    </div>
+    
+    <div class=\"achievement achievement-bp-master locked\">
+        <h4 style=\"margin-top: 0;\">🏆 Achievement: BuddyPress Master</h4>
+        <p style=\"margin-bottom: 0;\">Complete all tutorials to unlock this special achievement and earn 500 bonus points!</p>
+    </div>
+</div>"
 
 echo "Tutorial content for BuddyPress and BuddyX created successfully!"
 # endregion: TUTORIAL CONTENT CREATION
+
+# Add the Tutorial Course Curriculum page to the menu
+echo "Adding Tutorial Course Curriculum page to the menu..."
+MENU_ID=$(wp menu list --format=ids --path=/var/www/html | head -n 1)
+if [ -n "$MENU_ID" ]; then
+    wp menu item add-post $MENU_ID 36 --path=/var/www/html || true
+    echo "Added curriculum page to the menu."
+fi
 
 echo "Data population completed!"
