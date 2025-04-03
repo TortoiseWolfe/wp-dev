@@ -45,7 +45,18 @@ To access the repository:
    ssh -T git@github.com
    ```
 
-### 3. Start the Development Environment
+### 3. Configure Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file to customize:
+- Database credentials
+- WordPress admin account
+- Site URL and title
+
+### 4. Start the Development Environment
 
 ```bash
 docker-compose up -d
