@@ -5,6 +5,7 @@
 - COMPLETED: Simple demo of gamification in BuddyPress with BuddyX theme  
 - COMPLETED: Tutorial completion tracking and progress display
 - COMPLETED: Achievements and points system for users
+- IN PROGRESS: Allyship curriculum implementation
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
 
@@ -48,11 +49,34 @@
 - Database credentials stored in environment variables
 - WordPress configuration managed via wp-config.php
 
+## Curricula
+
+The environment contains two distinct curricula with separate content but shared gamification mechanics:
+
+### 1. BuddyPress Tutorial Curriculum
+
+A comprehensive tutorial series on building social networks with WordPress, BuddyPress, and BuddyX theme.
+
+#### Content Structure
+- **Getting Started**: Introduction, installation, and member profiles
+- **Group Management**: Creating groups and setting up discussions
+- **BuddyX Theme**: Theme introduction and customization
+
+### 2. Allyship Curriculum
+
+Educational modules focused on allyship in the workplace with interactive learning elements.
+
+#### Content Structure
+- **Defining Allyship**: Understanding what allyship means and how to practice it
+- **Interactive Elements**: Video, reflection prompts, graphic novella, scenarios
+- **Assessment Components**: Quiz scenarios with feedback and commitment builder
+- **Action Planning**: Tools for making and tracking allyship commitments
+
 ## Gamification
 
 ### Implementation Approach: Simple Visual Gamification
 
-The BuddyPress tutorial system includes basic gamification elements to demonstrate the concept:
+Both curricula include basic gamification elements to enhance the learning experience:
 
 #### Core Features
 - **Visual Progress Tracking**: Progress bar showing completion status (dynamically calculated)
@@ -85,4 +109,4 @@ The BuddyPress tutorial system includes basic gamification elements to demonstra
 - No database storage needed - client-side implementation
 - Progress is tracked per browser, not per user account
 
-This simple implementation provides a clear demonstration of how gamification techniques can enhance the learning experience in BuddyPress without requiring complex plugins or database integration.
+This simple implementation provides a clear demonstration of how gamification techniques can enhance the learning experience without requiring complex plugins or database integration.

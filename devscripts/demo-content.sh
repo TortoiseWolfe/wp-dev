@@ -1484,6 +1484,20 @@ wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post
 </div>"
 
 echo "Tutorial content for BuddyPress and BuddyX created successfully!"
+
+# Create Allyship System
+echo "Setting up Allyship System..."
+
+# Create directory for Allyship System
+mkdir -p /var/www/html/wp-content/plugins/allyship-system/assets
+
+# Copy the Allyship System files
+cp /usr/local/bin/devscripts/ally-content/allyship-system.php /var/www/html/wp-content/plugins/allyship-system/allyship-system.php
+
+# Setup Allyship System
+wp eval 'require_once(WP_CONTENT_DIR . "/plugins/allyship-system/allyship-system.php"); setup_allyship_system();' --path=/var/www/html || echo "Failed to set up Allyship System"
+
+echo "Allyship System setup complete!"
 # endregion: TUTORIAL CONTENT CREATION
 
 # Add the Tutorial Course Curriculum page to the menu
