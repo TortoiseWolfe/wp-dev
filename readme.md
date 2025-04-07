@@ -142,7 +142,7 @@ docker-compose down -v && docker image prune -a -f && docker-compose build && do
 ### Building Production Image
 
 ```bash
-docker build --target production -t yourorg/buddypress-allyship:latest .
+docker build --target production -t tortoisewolfe/buddypress-allyship:latest .
 ```
 
 ### Testing Production Build Locally
@@ -179,7 +179,7 @@ To use the automatically built image:
 
 ```bash
 # Pull the production image
-docker pull ghcr.io/[your-username]/wp-dev:latest
+docker pull ghcr.io/TortoiseWolfe/wp-dev:latest
 
 # Run with your configuration
 docker run -d -p 80:80 \
@@ -187,7 +187,7 @@ docker run -d -p 80:80 \
   -e WORDPRESS_DB_USER=your-db-user \
   -e WORDPRESS_DB_PASSWORD=your-db-password \
   -e WORDPRESS_DB_NAME=your-db-name \
-  ghcr.io/[your-username]/wp-dev:latest
+  ghcr.io/TortoiseWolfe/wp-dev:latest
 ```
 
 #### 2. Manual Deployment
@@ -196,10 +196,10 @@ For manual deployment to your own registry:
 
 ```bash
 # Build the production image
-docker build --target production -t yourorg/buddypress-allyship:latest .
+docker build --target production -t tortoisewolfe/buddypress-allyship:latest .
 
 # Push to your registry
-docker push yourorg/buddypress-allyship:latest
+docker push tortoisewolfe/buddypress-allyship:latest
 ```
 
 ### Production Environment Configuration
@@ -235,7 +235,7 @@ To upgrade to a new version:
 git pull
 
 # Rebuild production image
-docker build --target production -t yourorg/buddypress-allyship:latest .
+docker build --target production -t tortoisewolfe/buddypress-allyship:latest .
 
 # Stop existing container
 docker stop your-container-name
@@ -246,7 +246,7 @@ docker run -d -p 80:80 \
   -e WORDPRESS_DB_USER=your-db-user \
   -e WORDPRESS_DB_PASSWORD=your-db-password \
   -e WORDPRESS_DB_NAME=your-db-name \
-  yourorg/buddypress-allyship:latest
+  tortoisewolfe/buddypress-allyship:latest
 ```
 
 ### Backup Strategy

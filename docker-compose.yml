@@ -60,7 +60,7 @@ services:
   #   build:
   #     context: .
   #     target: production
-  #   image: yourorg/buddypress-allyship:latest
+  #   image: tortoisewolfe/buddypress-allyship:latest
   #   depends_on:
   #     - db
   #   ports:
