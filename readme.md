@@ -130,6 +130,18 @@ docker-compose down -v && docker image prune -a -f && docker-compose build && do
 
 ## Production Deployment
 
+### Using the Production Environment in docker-compose.yml
+
+The docker-compose.yml file contains a commented-out production section. To use it:
+
+1. Uncomment the `wordpress-prod` service section (lines 58-84)
+2. Modify the port from 8080 to 80 for a true production environment
+3. You can either:
+   - Keep the development section active (to run both environments simultaneously)
+   - Comment out the development section (if you only want the production environment)
+
+Note that when both environments are active, they will share the same database but use separate WordPress volumes.
+
 ### Complete Deployment Workflow
 
 1. **Local Development**: Develop and test features locally using development environment
@@ -354,12 +366,15 @@ Additional security measures to implement:
 ## Troubleshooting
 
 - **Container issues**: Try `docker-compose down -v` followed by `docker-compose up -d`
-- **Database connection errors**: Check environment variables in docker-compose.yml
+- **Database connection errors**: 
+  - Check that MYSQL_PASSWORD and WORDPRESS_DB_PASSWORD match in the .env file
+  - Verify all environment variables are properly set in docker-compose.yml
+  - Check logs with `docker-compose logs db` and `docker-compose logs wordpress`
 - **WordPress configuration**: Examine setup.sh for the installation process
 - **Missing plugins or themes**: Check logs with `docker logs [container-id]`
 - **Performance issues**: Consider implementing a caching solution
 - **Docker installation problems**: Check detailed logs at `/tmp/enhanced-boot.log`
-- **Database connectivity issues**: Confirm database credentials and network connection
+- **"Access denied for user" errors**: Ensure that password values match between MySQL and WordPress settings
 
 ## Additional Resources
 
