@@ -5,6 +5,7 @@
 - COMPLETED: Simple demo of gamification in BuddyPress with BuddyX theme  
 - COMPLETED: Tutorial completion tracking and progress display
 - COMPLETED: Achievements and points system for users
+- COMPLETED: Documentation consolidation in readme.md
 - IN PROGRESS: Allyship curriculum implementation
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
@@ -17,6 +18,12 @@
 - `docker-compose exec wordpress wp --allow-root [command]`: Run WP-CLI commands
 - `docker-compose exec wordpress bash`: Access WordPress container shell
 - `docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh`: Populate site with demo content
+
+## Running Production Image Locally
+- `docker-compose up -d db`: Start just the database container
+- `docker run -d -p 8888:80 --network wp-dev_default -e WORDPRESS_DB_HOST=db -e WORDPRESS_DB_USER=wordpress -e WORDPRESS_DB_PASSWORD=wordpress -e WORDPRESS_DB_NAME=wordpress -e WP_SITE_URL=http://[WSL-IP]:8888 mywordpress:prod`: Run production image
+- Replace `[WSL-IP]` with your WSL IP address (run `hostname -I | awk '{print $1}'` to get it)
+- Access the production site at http://[WSL-IP]:8888 from your Windows browser
 
 ## IMPORTANT: Changes to Script Files
 - Script files are copied into the container during build time
@@ -48,6 +55,51 @@
 - WordPress with BuddyPress using Docker
 - Database credentials stored in environment variables
 - WordPress configuration managed via wp-config.php
+
+## Development Roadmap & Best Practices
+
+### Infrastructure Improvements
+- [x] Fix script permissions (`chmod +x setup.sh EnhancedBoot/enhanced-boot.sh devscripts/demo-content.sh`)
+- [ ] Add specific version pinning for dependencies in Dockerfile
+- [ ] Create separate docker-compose.prod.yml for production configuration
+- [ ] Consider using Docker secrets for sensitive data instead of environment variables
+
+### Security Enhancements
+- [ ] Add HTTPS configuration with Let's Encrypt for production
+- [ ] Document WordPress security plugins for production
+- [ ] Implement additional Apache/PHP security hardening
+- [ ] Add firewall configuration examples for production servers
+- [ ] Add comprehensive security scanning in CI/CD pipeline
+
+### DevOps & CI/CD
+- [ ] Document required GitHub secrets for GitHub Actions workflow
+- [ ] Add basic tests to run before deployment
+- [ ] Enhance health checks for production containers
+- [ ] Document recommended monitoring setup
+- [ ] Implement centralized logging configuration
+- [ ] Add log rotation and management
+
+### Backup & Recovery
+- [ ] Add example scripts for automated backups
+- [ ] Document a complete disaster recovery procedure
+- [ ] Test and document restore procedures
+
+### Performance Optimization
+- [ ] Add caching recommendations for production
+- [ ] Document load testing procedures
+- [ ] Evaluate and document CDN integration options
+- [ ] Optimize Docker image size
+
+### Documentation
+- [ ] Add environment variable validation in scripts
+- [ ] Document routine maintenance tasks
+- [ ] Add WordPress core and plugin update strategy
+- [ ] Create troubleshooting guide for common issues
+
+### Multi-environment Support
+- [ ] Create staging environment configuration
+- [ ] Document environment-specific configurations
+- [ ] Add proper environment detection in scripts
 
 ## Curricula
 

@@ -1,6 +1,5 @@
 # docker-compose.yml
-# keeping version for swarm
-# version: '3.8'
+version: '3.8'
 
 services:
   db:
@@ -14,11 +13,12 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     restart: always
 
+  # Development environment
   wordpress:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: mywordpress:latest
+      target: development
+    image: mywordpress:dev
     depends_on:
       - db
     ports:
@@ -33,7 +33,7 @@ services:
     restart: always
 
   wp-setup:
-    image: mywordpress:latest
+    image: mywordpress:dev
     depends_on:
       - wordpress
     environment:
@@ -55,6 +55,35 @@ services:
               /usr/local/bin/devscripts/demo-content.sh"
     restart: "no"
 
+  # Production environment (uncomment when ready for production)
+  # wordpress-prod:
+  #   build:
+  #     context: .
+  #     target: production
+  #   image: yourorg/buddypress-allyship:latest
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - "8080:80"
+  #   environment:
+  #     WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+  #     WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+  #     WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+  #     WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+  #     WORDPRESS_CONFIG_EXTRA: |
+  #       define('WP_DEBUG', false);
+  #       define('WP_MEMORY_LIMIT', '256M');
+  #       define('WP_AUTO_UPDATE_CORE', false);
+  #   volumes:
+  #     - wp_prod_data:/var/www/html
+  #   restart: always
+  #   healthcheck:
+  #     test: ["CMD", "wp", "core", "is-installed", "--allow-root"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+
 volumes:
   db_data:
   wp_data:
+  wp_prod_data:

@@ -1,12 +1,23 @@
 # WordPress Development Environment
 
-This repository provides a Docker-based WordPress development environment with BuddyPress installed. Follow the instructions below to get started with local development.
+This repository provides a Docker-based WordPress development environment with BuddyPress installed, supporting both local development and production deployment.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 - Git
 - SSH key for repository access
+- GitHub account (for using GitHub Container Registry)
+
+## Table of Contents
+
+- [Initial Setup](#initial-setup)
+- [Development Workflow](#development-workflow)
+- [Production Deployment](#production-deployment)
+- [Server Setup](#server-setup)
+- [Git Workflow](#git-workflow)
+- [Troubleshooting](#troubleshooting)
+- [Additional Resources](#additional-resources)
 
 ## Initial Setup
 
@@ -67,7 +78,7 @@ This will:
 - Set up a MySQL database
 - Run the setup script to configure WordPress and BuddyPress
 
-## Daily Development Workflow
+## Development Workflow
 
 ### Running the Environment
 
@@ -109,6 +120,193 @@ This will create:
 - 5 sample pages with philosophical content
 - Example messages to admin (if BuddyPress Messages is active)
 
+### Modifying Script Files
+
+When modifying scripts in `devscripts/` or `setup.sh`, you MUST rebuild from scratch:
+
+```bash
+docker-compose down -v && docker image prune -a -f && docker-compose build && docker-compose up -d
+```
+
+## Production Deployment
+
+### Complete Deployment Workflow
+
+1. **Local Development**: Develop and test features locally using development environment
+2. **Build Production Image**: Create a production-ready Docker image
+3. **Test Production Locally**: Verify production image works correctly
+4. **Push to Container Registry**: Upload image to GitHub Container Registry
+5. **Server Preparation**: Set up production server with EnhancedBoot script
+6. **Deploy to Production**: Pull and run the image on production server
+
+### Building Production Image
+
+```bash
+docker build --target production -t yourorg/buddypress-allyship:latest .
+```
+
+### Testing Production Build Locally
+
+```bash
+# Start just the database
+docker-compose up -d db
+
+# Build production image
+docker build --target production -t mywordpress:prod .
+
+# Run production image with local database
+docker run -d -p 8888:80 \
+  --network wp-dev_default \
+  -e WORDPRESS_DB_HOST=db \
+  -e WORDPRESS_DB_USER=wordpress \
+  -e WORDPRESS_DB_PASSWORD=wordpress \
+  -e WORDPRESS_DB_NAME=wordpress \
+  -e WP_SITE_URL=http://$(hostname -I | awk '{print $1}'):8888 \
+  mywordpress:prod
+
+# Access at http://[Your-IP]:8888
+```
+
+### Deployment Options
+
+#### 1. GitHub Container Registry (Automated)
+
+The repository is configured with GitHub Actions to automatically build and publish Docker images to GitHub Container Registry whenever:
+- You push to the main branch
+- You create a new tag (v*.*.*)
+
+To use the automatically built image:
+
+```bash
+# Pull the production image
+docker pull ghcr.io/[your-username]/wp-dev:latest
+
+# Run with your configuration
+docker run -d -p 80:80 \
+  -e WORDPRESS_DB_HOST=your-db-host \
+  -e WORDPRESS_DB_USER=your-db-user \
+  -e WORDPRESS_DB_PASSWORD=your-db-password \
+  -e WORDPRESS_DB_NAME=your-db-name \
+  ghcr.io/[your-username]/wp-dev:latest
+```
+
+#### 2. Manual Deployment
+
+For manual deployment to your own registry:
+
+```bash
+# Build the production image
+docker build --target production -t yourorg/buddypress-allyship:latest .
+
+# Push to your registry
+docker push yourorg/buddypress-allyship:latest
+```
+
+### Production Environment Configuration
+
+The production environment requires the following environment variables:
+
+```
+WORDPRESS_DB_HOST=db-hostname
+WORDPRESS_DB_USER=db-username
+WORDPRESS_DB_PASSWORD=db-password
+WORDPRESS_DB_NAME=db-name
+WP_SITE_URL=https://your-domain.com
+WP_SITE_TITLE=Your Site Title
+WP_ADMIN_USER=admin-username
+WP_ADMIN_PASSWORD=admin-password
+WP_ADMIN_EMAIL=admin@example.com
+```
+
+### Upgrade Procedure
+
+#### Automated Upgrades via GitHub
+
+To upgrade to a new version:
+
+1. Tag a new release in GitHub (e.g., `v1.0.1`)
+2. GitHub Actions will build and publish the new image
+3. Pull the new image and restart your container
+
+#### Manual Upgrade
+
+```bash
+# Pull latest code changes
+git pull
+
+# Rebuild production image
+docker build --target production -t yourorg/buddypress-allyship:latest .
+
+# Stop existing container
+docker stop your-container-name
+
+# Start new container with updated image
+docker run -d -p 80:80 \
+  -e WORDPRESS_DB_HOST=your-db-host \
+  -e WORDPRESS_DB_USER=your-db-user \
+  -e WORDPRESS_DB_PASSWORD=your-db-password \
+  -e WORDPRESS_DB_NAME=your-db-name \
+  yourorg/buddypress-allyship:latest
+```
+
+### Backup Strategy
+
+Always backup before upgrading:
+
+```bash
+# Database backup
+docker exec -it db_container mysqldump -u root -p wordpress > backup.sql
+
+# WordPress files backup
+docker cp wordpress_container:/var/www/html/wp-content ./wp-content-backup
+```
+
+## Server Setup
+
+### Server Preparation with EnhancedBoot
+
+For production environments, use the comprehensive server bootstrap script to:
+- Update system packages with robust retry mechanisms
+- Install and configure Docker with proper security settings
+- Configure swap space for better performance
+- Add security hardening measures
+- Prepare optimal WordPress environment settings
+
+To use the script on a new server:
+
+```bash
+# Copy the script to the server
+scp EnhancedBoot/enhanced-boot.sh user@server:/tmp/
+
+# Connect to the server and run the script
+ssh user@server
+sudo bash /tmp/enhanced-boot.sh
+```
+
+The script creates detailed logs at `/tmp/enhanced-boot.log` for troubleshooting.
+
+### Security Considerations
+
+The production image includes:
+- Minimal installed packages
+- Proper file permissions
+- Non-root user operation
+- Apache security configuration
+- Health checks
+
+The EnhancedBoot script provides additional server-level security:
+- Package update and management system
+- Controlled Docker installation procedure
+- Robust error handling and logging
+- Swap space configuration for performance
+- Server timezone and environment configuration
+
+Additional security measures to implement:
+- UFW firewall configuration
+- SSH hardening
+- Password policies
+- Regular security updates
+
 ## Git Workflow
 
 ### Branching Strategy
@@ -134,7 +332,7 @@ This will create:
 ### Creating Pull Requests
 
 1. Go to the repository on GitHub
-2. Click "Pull Requests" � "New Pull Request"
+2. Click "Pull Requests" → "New Pull Request"
 3. Select your branch and the target branch (main)
 4. Fill in the PR template with:
    - Description of changes
@@ -158,9 +356,15 @@ This will create:
 - **Container issues**: Try `docker-compose down -v` followed by `docker-compose up -d`
 - **Database connection errors**: Check environment variables in docker-compose.yml
 - **WordPress configuration**: Examine setup.sh for the installation process
+- **Missing plugins or themes**: Check logs with `docker logs [container-id]`
+- **Performance issues**: Consider implementing a caching solution
+- **Docker installation problems**: Check detailed logs at `/tmp/enhanced-boot.log`
+- **Database connectivity issues**: Confirm database credentials and network connection
 
 ## Additional Resources
 
 - [WordPress Codex](https://codex.wordpress.org/)
 - [BuddyPress Documentation](https://codex.buddypress.org/)
 - [WP-CLI Commands](https://developer.wordpress.org/cli/commands/)
+- [Docker Documentation](https://docs.docker.com/)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)

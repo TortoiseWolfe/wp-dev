@@ -1,26 +1,52 @@
-# .dockerignore
-
-# Exclude Git repository data
+# Ignore version control files
 .git
 .gitignore
+.github
 
-# Exclude Node.js dependencies (if applicable)
-node_modules
+# Ignore editor files
+.vscode
+.idea
+*.sublime-*
+*.swp
+*.swo
 
-# Exclude temporary files and directories
-tmp
+# Ignore Docker files
+.dockerignore
+
+# Ignore documentation files
+README.md
+LICENSE
+
+# Ignore local development files
 *.log
-
-# Exclude environment configuration files containing sensitive information
+*.sql
+*.sqlite
 .env
-.env.local
+.env.*
+!.env.example
 
-# Exclude OS-specific files
+# Ignore WordPress specific files that should not be in the image
+wp-content/uploads/*
+wp-content/cache/*
+wp-content/upgrade/*
+wp-content/backup-db/*
+wp-content/updraft/*
+wp-content/backups-*/*
+wp-content/managewp/*
+wp-content/advanced-cache.php
+wp-content/wp-cache-config.php
+wp-content/debug.log
+
+# Ignore node dependency directories
+node_modules/
+
+# Ignore build directories
+/dist
+/build
+/out
+
+# Ignore macOS specific files
 .DS_Store
-Thumbs.db
-
-# Optional: Exclude Composer dependencies if you plan to install them during the build process
-vendor
-
-# Optional: Exclude build caches or other artifacts
-cache
+.AppleDouble
+.LSOverride
+._*
