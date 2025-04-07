@@ -187,11 +187,36 @@ The repository is configured with GitHub Actions to automatically build and publ
 - You push to the main branch
 - You create a new tag (v*.*.*)
 
-To use the automatically built image:
+##### Setting up GitHub Container Registry Access
+
+1. Generate a GitHub Personal Access Token:
+   - Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+   - Create a new token with these permissions:
+     - Repository access: Select your repositories
+     - Permissions: read/write access to packages
+   - Copy the generated token
+
+2. Authenticate with GitHub Container Registry:
+   ```bash
+   echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+   ```
+   
+3. If you get "permission denied" errors with Docker commands:
+   ```bash
+   # Either use sudo for each command:
+   sudo docker pull ghcr.io/tortoisewolfe/wp-dev:latest
+   
+   # Or add your user to the docker group (permanent fix):
+   sudo usermod -aG docker $USER
+   # Then log out and log back in, or run:
+   newgrp docker
+   ```
+
+##### Using the GitHub Container Registry image:
 
 ```bash
-# Pull the production image
-docker pull ghcr.io/TortoiseWolfe/wp-dev:latest
+# Pull the production image (use lowercase for repository name)
+docker pull ghcr.io/tortoisewolfe/wp-dev:latest
 
 # Run with your configuration
 docker run -d -p 80:80 \
@@ -199,7 +224,7 @@ docker run -d -p 80:80 \
   -e WORDPRESS_DB_USER=your-db-user \
   -e WORDPRESS_DB_PASSWORD=your-db-password \
   -e WORDPRESS_DB_NAME=your-db-name \
-  ghcr.io/TortoiseWolfe/wp-dev:latest
+  ghcr.io/tortoisewolfe/wp-dev:latest
 ```
 
 #### 2. Manual Deployment
@@ -375,6 +400,15 @@ Additional security measures to implement:
 - **Performance issues**: Consider implementing a caching solution
 - **Docker installation problems**: Check detailed logs at `/tmp/enhanced-boot.log`
 - **"Access denied for user" errors**: Ensure that password values match between MySQL and WordPress settings
+- **Docker permission denied errors**:
+  - Error: `permission denied while trying to connect to the Docker daemon socket`
+  - Solution: Either use `sudo` with Docker commands or add your user to the docker group:
+    ```bash
+    sudo usermod -aG docker $USER && newgrp docker
+    ```
+- **GitHub Container Registry access denied**:
+  - Error: `denied: denied` when pulling images
+  - Solution: Authenticate with a personal access token as described in the [GitHub Container Registry section](#1-github-container-registry-automated)
 
 ## Additional Resources
 
