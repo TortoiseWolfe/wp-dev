@@ -65,8 +65,9 @@ jobs:
           target: production
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          driver: containerd
           driver-opts: |
-            image=moby/buildkit:master
+            image=containerd/buildkit:v0.12.5
 
       # Sign the resulting Docker image digest 
       - name: Sign the published Docker image
