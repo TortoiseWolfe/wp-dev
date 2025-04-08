@@ -130,21 +130,30 @@ docker-compose down -v && docker image prune -a -f && docker-compose build && do
 
 ## Production Deployment
 
-### Complete Deployment Workflow Overview
+### Automated CI/CD Deployment 
 
-The deployment process involves two main environments:
-1. **Local Development Machine**: Where you develop, test, and build the Docker image
-2. **Production Server**: Where your WordPress site will be publicly hosted
+This repository is configured with GitHub Actions to automatically build and publish Docker images to GitHub Container Registry whenever:
+- You push to the `main` branch
+- You create a new tag (`v*.*.*`)
 
-Here's the complete workflow:
-1. On your **local machine**: Build and test the application
-2. On your **local machine**: Build and push the production Docker image to GitHub Container Registry
-3. On your **production server**: Clone the repository and configure the environment
-4. On your **production server**: Pull the image and launch the production services
+### Complete Deployment Workflow
 
-### Building and Testing Locally
+1. **On your local machine**:
+   - Make your changes and push to main
+   ```bash
+   git add .
+   git commit -m "Your meaningful commit message"
+   git push origin main
+   ```
+   - GitHub Actions automatically builds and pushes the Docker image
+   - Monitor the build in the "Actions" tab of your GitHub repository
 
-Before deploying to production, you should verify that the production setup works correctly on your local machine:
+2. **On your production server**:
+   - Pull the image and deploy it (see "Production Server Deployment" below)
+
+### Testing Production Setup Locally
+
+Before deploying to production, verify that the production setup works correctly on your local machine:
 
 ```bash
 # On your LOCAL MACHINE
@@ -155,9 +164,9 @@ docker-compose up -d
 # Access production site at http://localhost:80
 ```
 
-### GitHub Personal Access Token Setup
+### GitHub Token for Pulling Images
 
-Before deploying to production, you need to create a GitHub Personal Access Token for accessing the Container Registry:
+You need a GitHub Personal Access Token to pull images from GitHub Container Registry on your production server:
 
 1. Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
 2. Click "Generate new token"
@@ -165,64 +174,32 @@ Before deploying to production, you need to create a GitHub Personal Access Toke
 4. Set an expiration date (recommend 90 days)
 5. Under Repository access, select "Only select repositories" and choose your wp-dev repository
 6. Under Permissions → Repository permissions:
-   - Find "Packages" and set to "Read and write"
+   - Set "Packages" to "Read"
 7. Click "Generate token"
 8. **IMPORTANT**: Copy the token immediately (you won't be able to see it again)
 
-You'll need to set up this token on both your local machine and production server:
-
-#### On your local machine (choose one method):
+#### Setting up the token on your production server:
 
 ```bash
-# Method 1: Set token for current session only
+# Option 1: Add to your .env file (recommended)
+# The GITHUB_TOKEN variable is already included in the .env.example
+# Just add your actual token value when setting up your .env file
+nano /var/www/wp-dev/.env
+# Find the GITHUB_TOKEN line and replace with your actual token
+GITHUB_TOKEN=ghp_your_personal_access_token_here
+
+# Option 2: Set token for current session only 
 export GITHUB_TOKEN=ghp_your_personal_access_token_here
-
-# Method 2: Add to your shell profile for persistence
-echo 'export GITHUB_TOKEN=ghp_your_personal_access_token_here' >> ~/.bashrc
-source ~/.bashrc
 ```
 
-#### On your production server (choose one method):
-
+Make sure your .env file has proper permissions:
 ```bash
-# Method 1: Set token for current session only
-export GITHUB_TOKEN=ghp_your_personal_access_token_here
-
-# Method 2: Save to a secure environment file
-echo 'export GITHUB_TOKEN=ghp_your_personal_access_token_here' > /var/www/wp-dev/.env.deploy
-chmod 600 /var/www/wp-dev/.env.deploy  # Restrict permissions for security
-
-# Then in your deploy script, add:
-if [ -f /var/www/wp-dev/.env.deploy ]; then
-    source /var/www/wp-dev/.env.deploy
-fi
+chmod 600 /var/www/wp-dev/.env  # Restrict permissions for security
 ```
 
-### Production Deployment Steps
+### Production Server Deployment
 
-#### 1. Build and Push Production Image (On Local Machine)
-
-These steps are performed on your local development machine:
-
-```bash
-# ON YOUR LOCAL MACHINE
-# Navigate to your project directory
-cd /path/to/your/wp-dev
-
-# Make sure you have set up your GitHub token (see above)
-# Then authenticate with GitHub Container Registry
-echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-
-# Build the Docker image targeting the production stage
-docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:latest .
-
-# Push the image to GitHub Container Registry
-docker push ghcr.io/tortoisewolfe/buddypress-allyship:latest
-```
-
-#### 2. Server Setup and Deployment (On Production Server)
-
-These steps are performed on your production server:
+After GitHub Actions builds the image, perform these steps on your production server:
 
 ```bash
 # ON YOUR PRODUCTION SERVER
@@ -239,8 +216,8 @@ git pull origin main
 cp .env.example .env
 nano .env  # Edit with production values
 
-# Make sure you have set up your GitHub token (see above)
-# Then authenticate with GitHub Container Registry
+# GitHub token should be in your .env file
+# Authenticate with GitHub Container Registry
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
 
 # Pull the latest production image 
@@ -295,17 +272,18 @@ git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
 
-# Step 3: Authenticate with GitHub Container Registry
-if [ -f /var/www/wp-dev/.env.deploy ]; then
-    log "Loading GitHub token from .env.deploy file..."
-    source /var/www/wp-dev/.env.deploy
+# Step 3: Get GitHub token from .env file or environment
+# Load from .env file
+if [ -f "${PROJECT_DIR}/.env" ]; then
+    log "Loading GitHub token from .env file..."
+    GITHUB_TOKEN=$(grep GITHUB_TOKEN "${PROJECT_DIR}/.env" | cut -d= -f2)
 fi
 
 if [ -z "$GITHUB_TOKEN" ]; then
-    echo "Error: GITHUB_TOKEN is not set in the environment."
-    echo "Please set it up using one of these methods:"
-    echo "1. export GITHUB_TOKEN=your_token"
-    echo "2. Create a /var/www/wp-dev/.env.deploy file with: export GITHUB_TOKEN=your_token"
+    echo "Error: GITHUB_TOKEN is not set."
+    echo "Please add your GitHub token to your .env file:"
+    echo "GITHUB_TOKEN=your_personal_access_token"
+    echo "Or export it in your environment: export GITHUB_TOKEN=your_token"
     exit 1
 fi
 
