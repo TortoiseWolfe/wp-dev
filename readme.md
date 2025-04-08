@@ -475,6 +475,49 @@ Additional security measures to implement:
 - Password policies
 - Regular security updates
 
+#### Security Monitoring Commands
+
+Check who has successfully logged into the server (with count):
+```bash
+sudo grep "Accepted" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr
+```
+
+Review failed login attempts (grouped by username and IP with count):
+```bash
+sudo grep "Failed password" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr
+```
+
+Count total successful logins:
+```bash
+sudo grep "Accepted" /var/log/auth.log | wc -l
+```
+
+Count total failed login attempts:
+```bash
+sudo grep "Failed password" /var/log/auth.log | wc -l
+```
+
+Monitor current logged-in users:
+```bash
+who
+```
+
+Check user login history (most recent first):
+```bash
+last | head -20
+```
+
+Quick security summary report:
+```bash
+echo "=== SECURITY LOGIN SUMMARY ===" && \
+echo "Total successful logins: $(sudo grep "Accepted" /var/log/auth.log | wc -l)" && \
+echo "Total failed attempts: $(sudo grep "Failed password" /var/log/auth.log | wc -l)" && \
+echo -e "\nTop 5 successful logins by user/IP:" && \
+sudo grep "Accepted" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr | head -5 && \
+echo -e "\nTop 5 failed logins by user/IP:" && \
+sudo grep "Failed password" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr | head -5
+```
+
 ## Git Workflow
 
 ### Branching Strategy
