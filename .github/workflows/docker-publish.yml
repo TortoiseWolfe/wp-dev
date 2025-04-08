@@ -25,6 +25,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        
+      # Set up Docker Buildx with containerd driver
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: containerd
+          driver-opts: image=containerd/buildkit:v0.12.5
+          buildkitd-flags: --debug
 
       # Install the cosign tool
       - name: Install cosign
@@ -65,9 +73,6 @@ jobs:
           target: production
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          driver: containerd
-          driver-opts: |
-            image=containerd/buildkit:v0.12.5
 
       # Sign the resulting Docker image digest 
       - name: Sign the published Docker image
