@@ -570,12 +570,12 @@ else
     fi
 fi
 
-# Create .env file in /opt/wordpress directory
+# Create .env file in /var/www/wp-dev directory
 echo "Creating .env file for production" >> $LOG_FILE
 
 # Create directory if it doesn't exist
-mkdir -p /opt/wordpress
-cat > /opt/wordpress/.env << 'EOF'
+mkdir -p /var/www/wp-dev
+cat > /var/www/wp-dev/.env << 'EOF'
 # MySQL credentials
 MYSQL_ROOT_PASSWORD=rootpassword
 MYSQL_DATABASE=wordpress
@@ -602,9 +602,9 @@ GITHUB_TOKEN=your_github_personal_access_token_here
 EOF
 
 # Set proper permissions
-chmod 600 /opt/wordpress/.env
-echo "Created .env file with default values in /opt/wordpress/" >> $LOG_FILE
-echo "Note: Users can edit this file with: sudo nano /opt/wordpress/.env" >> $LOG_FILE
+chmod 600 /var/www/wp-dev/.env
+echo "Created .env file with default values in /var/www/wp-dev/" >> $LOG_FILE
+echo "Note: Users can edit this file with: sudo nano /var/www/wp-dev/.env" >> $LOG_FILE
 
 # Create a marker file to indicate completion
 touch /tmp/enhanced-boot-completed
