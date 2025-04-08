@@ -65,6 +65,8 @@ jobs:
           target: production
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          driver-opts: |
+            image=moby/buildkit:master
 
       # Sign the resulting Docker image digest 
       - name: Sign the published Docker image
