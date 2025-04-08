@@ -408,6 +408,7 @@ For production environments, use the comprehensive server bootstrap script to:
 - Configure swap space for better performance
 - Add security hardening measures
 - Prepare optimal WordPress environment settings
+- Create a default .env file with configuration values
 
 To use the script on a new server:
 
@@ -421,6 +422,36 @@ sudo bash /tmp/enhanced-boot.sh
 ```
 
 The script creates detailed logs at `/tmp/enhanced-boot.log` for troubleshooting.
+
+#### Environment Configuration for Production
+
+The enhanced-boot.sh script automatically creates a `.env` file in `/opt/wordpress/` with default configuration values. After running the script:
+
+1. **Edit the environment variables:**
+   ```bash
+   sudo nano /opt/wordpress/.env
+   ```
+
+2. **Load environment variables in your session:**
+   ```bash
+   source /opt/wordpress/.env
+   ```
+
+3. **Use the environment variables with Docker:**
+   ```bash
+   # Launch with environment variables from the file
+   docker-compose --env-file /opt/wordpress/.env up -d
+   ```
+
+4. **For automation scripts, reference the file:**
+   ```bash
+   # In your scripts, read values from the .env file
+   if [ -f "/opt/wordpress/.env" ]; then
+       source /opt/wordpress/.env
+   fi
+   ```
+
+Make sure to update critical values such as database passwords, admin credentials, and the site URL before deploying your application.
 
 ### Security Considerations
 

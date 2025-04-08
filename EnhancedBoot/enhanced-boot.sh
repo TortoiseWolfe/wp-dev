@@ -570,6 +570,42 @@ else
     fi
 fi
 
+# Create .env file in /opt/wordpress directory
+echo "Creating .env file for production" >> $LOG_FILE
+
+# Create directory if it doesn't exist
+mkdir -p /opt/wordpress
+cat > /opt/wordpress/.env << 'EOF'
+# MySQL credentials
+MYSQL_ROOT_PASSWORD=rootpassword
+MYSQL_DATABASE=wordpress
+MYSQL_USER=wordpress
+MYSQL_PASSWORD=wordpress
+
+# WordPress database connection
+WORDPRESS_DB_HOST=db:3306
+WORDPRESS_DB_USER=wordpress
+WORDPRESS_DB_PASSWORD=wordpress
+WORDPRESS_DB_NAME=wordpress
+
+# WordPress installation settings
+WP_SITE_URL=http://localhost:80
+WP_SITE_TITLE="My WordPress Site"
+WP_ADMIN_USER=admin
+WP_ADMIN_PASSWORD=admin_password
+WP_ADMIN_EMAIL=admin@example.com
+
+# GitHub Container Registry access
+# Generate a token with 'read:packages' permission at:
+# https://github.com/settings/tokens/new
+GITHUB_TOKEN=your_github_personal_access_token_here
+EOF
+
+# Set proper permissions
+chmod 600 /opt/wordpress/.env
+echo "Created .env file with default values in /opt/wordpress/" >> $LOG_FILE
+echo "Note: Users can edit this file with: sudo nano /opt/wordpress/.env" >> $LOG_FILE
+
 # Create a marker file to indicate completion
 touch /tmp/enhanced-boot-completed
 
