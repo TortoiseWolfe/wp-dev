@@ -130,160 +130,141 @@ docker-compose down -v && docker image prune -a -f && docker-compose build && do
 
 ## Production Deployment
 
-### Using the Production Environment in docker-compose.yml
-
-The docker-compose.yml file contains a commented-out production section. To use it:
-
-1. Uncomment the `wordpress-prod` service section (lines 58-84)
-2. Modify the port from 8080 to 80 for a true production environment
-3. You can either:
-   - Keep the development section active (to run both environments simultaneously)
-   - Comment out the development section (if you only want the production environment)
-
-Note that when both environments are active, they will share the same database but use separate WordPress volumes.
-
 ### Complete Deployment Workflow
 
 1. **Local Development**: Develop and test features locally using development environment
-2. **Build Production Image**: Create a production-ready Docker image
-3. **Test Production Locally**: Verify production image works correctly
-4. **Push to Container Registry**: Upload image to GitHub Container Registry
-5. **Server Preparation**: Set up production server with EnhancedBoot script
-6. **Deploy to Production**: Pull and run the image on production server
+2. **Test Production Locally**: Verify production setup works correctly
+3. **Build & Push Production Image**: Build and push the image to GitHub Container Registry
+4. **Server Preparation**: Set up production server with EnhancedBoot script
+5. **Deploy to Production**: Set up docker-compose and pull the image from GHCR
 
-### Building Production Image
+### Testing Production Setup Locally
 
-```bash
-docker build --target production -t tortoisewolfe/buddypress-allyship:latest .
-```
-
-### Testing Production Build Locally
+The docker-compose.yml file already contains a production section with a wordpress-prod service:
 
 ```bash
-# Start just the database
-docker-compose up -d db
+# Run both development and production environments locally
+docker-compose up -d
 
-# Build production image
-docker build --target production -t mywordpress:prod .
-
-# Run production image with local database
-docker run -d -p 8888:80 \
-  --network wp-dev_default \
-  -e WORDPRESS_DB_HOST=db \
-  -e WORDPRESS_DB_USER=wordpress \
-  -e WORDPRESS_DB_PASSWORD=wordpress \
-  -e WORDPRESS_DB_NAME=wordpress \
-  -e WP_SITE_URL=http://$(hostname -I | awk '{print $1}'):8888 \
-  mywordpress:prod
-
-# Access at http://[Your-IP]:8888
+# Access dev site at http://localhost:8000
+# Access production site at http://[Your-IP]:80
 ```
 
-### Deployment Options
+### Production Deployment Steps
 
-#### 1. GitHub Container Registry (Automated)
+#### 1. Build and Push Production Image to GitHub Container Registry
 
-The repository is configured with GitHub Actions to automatically build and publish Docker images to GitHub Container Registry whenever:
-- You push to the main branch
-- You create a new tag (v*.*.*)
-
-##### Setting up GitHub Container Registry Access
-
-1. Generate a GitHub Personal Access Token:
-   - Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
-   - Create a new token with these permissions:
-     - Repository access: Select your repositories
-     - Permissions: read/write access to packages
-   - Copy the generated token
-
-2. Authenticate with GitHub Container Registry:
+1. Authenticate with GitHub Container Registry:
    ```bash
-   echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-   ```
-   
-3. If you get "permission denied" errors with Docker commands:
-   ```bash
-   # Either use sudo for each command:
-   sudo docker pull ghcr.io/tortoisewolfe/wp-dev:latest
-   
-   # Or add your user to the docker group (permanent fix):
-   sudo usermod -aG docker $USER
-   # Then log out and log back in, or run:
-   newgrp docker
+   echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
    ```
 
-##### Using the GitHub Container Registry image:
+2. Build and tag the production image:
+   ```bash
+   docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:latest .
+   ```
+
+3. Push the image to GitHub Container Registry:
+   ```bash
+   docker push ghcr.io/tortoisewolfe/buddypress-allyship:latest
+   ```
+
+#### 2. Server Setup
+
+1. Set up your production server using the EnhancedBoot script (see [Server Setup](#server-setup))
+2. Install Docker and Docker Compose on the server
+
+#### 3. Configure Production Environment
+
+1. Clone the repository on your production server:
+   ```bash
+   git clone https://github.com/TortoiseWolfe/wp-dev.git
+   cd wp-dev
+   ```
+
+2. Create and configure your .env file for production:
+   ```bash
+   cp .env.example .env
+   nano .env  # Edit with production values
+   ```
+
+3. Make sure these environment variables are properly set for production:
+   ```
+   WORDPRESS_DB_HOST=db:3306
+   WORDPRESS_DB_USER=your_db_user
+   WORDPRESS_DB_PASSWORD=your_db_password
+   WORDPRESS_DB_NAME=your_db_name
+   WP_SITE_URL=https://your-domain.com
+   WP_SITE_TITLE=Your Site Title
+   WP_ADMIN_USER=admin_username
+   WP_ADMIN_PASSWORD=strong_admin_password
+   WP_ADMIN_EMAIL=admin@example.com
+   ```
+
+4. Update docker-compose.yml for production:
+   - You might want to comment out the development services
+   - Make sure the wordpress-prod image points to your GHCR image:
+     ```yaml
+     wordpress-prod:
+       image: ghcr.io/tortoisewolfe/buddypress-allyship:latest
+     ```
+
+5. Authenticate with GitHub Container Registry on the production server:
+   ```bash
+   echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+   ```
+
+#### 4. Launch Production Environment
 
 ```bash
-# Pull the production image (use lowercase for repository name)
-docker pull ghcr.io/tortoisewolfe/wp-dev:latest
+# Pull the latest image
+docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
 
-# Run with your configuration
-docker run -d -p 80:80 \
-  -e WORDPRESS_DB_HOST=your-db-host \
-  -e WORDPRESS_DB_USER=your-db-user \
-  -e WORDPRESS_DB_PASSWORD=your-db-password \
-  -e WORDPRESS_DB_NAME=your-db-name \
-  ghcr.io/tortoisewolfe/wp-dev:latest
-```
+# Start the production environment
+docker-compose up -d wordpress-prod wp-prod-setup db
 
-#### 2. Manual Deployment
-
-For manual deployment to your own registry:
-
-```bash
-# Build the production image
-docker build --target production -t tortoisewolfe/buddypress-allyship:latest .
-
-# Push to your registry
-docker push tortoisewolfe/buddypress-allyship:latest
-```
-
-### Production Environment Configuration
-
-The production environment requires the following environment variables:
-
-```
-WORDPRESS_DB_HOST=db-hostname
-WORDPRESS_DB_USER=db-username
-WORDPRESS_DB_PASSWORD=db-password
-WORDPRESS_DB_NAME=db-name
-WP_SITE_URL=https://your-domain.com
-WP_SITE_TITLE=Your Site Title
-WP_ADMIN_USER=admin-username
-WP_ADMIN_PASSWORD=admin-password
-WP_ADMIN_EMAIL=admin@example.com
+# Verify everything is running
+docker-compose ps
 ```
 
 ### Upgrade Procedure
 
-#### Automated Upgrades via GitHub
+To upgrade your production environment:
 
-To upgrade to a new version:
+1. Build and push a new image (from your development machine):
+   ```bash
+   # Update your code, then build and push a new image
+   docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:latest .
+   docker push ghcr.io/tortoisewolfe/buddypress-allyship:latest
+   ```
 
-1. Tag a new release in GitHub (e.g., `v1.0.1`)
-2. GitHub Actions will build and publish the new image
-3. Pull the new image and restart your container
+2. On the production server, pull the new image and restart:
+   ```bash
+   cd /path/to/wp-dev
+   git pull  # Update docker-compose.yml and scripts if needed
+   docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
+   docker-compose down wordpress-prod wp-prod-setup
+   docker-compose up -d wordpress-prod wp-prod-setup
+   ```
 
-#### Manual Upgrade
+For major updates that require data migration:
 
+1. Create a backup first (see [Backup Strategy](#backup-strategy))
+2. Follow the standard upgrade procedure
+3. If needed, run database migrations:
+   ```bash
+   docker-compose exec wordpress-prod wp core update-db --allow-root
+   ```
+
+You can tag specific versions to maintain rollback capability:
 ```bash
-# Pull latest code changes
-git pull
+# Tag a specific version
+docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:v1.2.3 .
+docker push ghcr.io/tortoisewolfe/buddypress-allyship:v1.2.3
 
-# Rebuild production image
-docker build --target production -t tortoisewolfe/buddypress-allyship:latest .
-
-# Stop existing container
-docker stop your-container-name
-
-# Start new container with updated image
-docker run -d -p 80:80 \
-  -e WORDPRESS_DB_HOST=your-db-host \
-  -e WORDPRESS_DB_USER=your-db-user \
-  -e WORDPRESS_DB_PASSWORD=your-db-password \
-  -e WORDPRESS_DB_NAME=your-db-name \
-  tortoisewolfe/buddypress-allyship:latest
+# On production, use a specific version
+docker pull ghcr.io/tortoisewolfe/buddypress-allyship:v1.2.3
+# Update docker-compose.yml to use the specific version
 ```
 
 ### Backup Strategy
@@ -292,10 +273,22 @@ Always backup before upgrading:
 
 ```bash
 # Database backup
-docker exec -it db_container mysqldump -u root -p wordpress > backup.sql
+docker-compose exec db mysqldump -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} > backup.sql
 
 # WordPress files backup
-docker cp wordpress_container:/var/www/html/wp-content ./wp-content-backup
+docker-compose exec wordpress-prod tar -czf /tmp/wp-content-backup.tar.gz /var/www/html/wp-content
+docker cp wp-dev_wordpress-prod_1:/tmp/wp-content-backup.tar.gz ./wp-content-backup.tar.gz
+```
+
+To restore from backup:
+
+```bash
+# Restore database
+cat backup.sql | docker-compose exec -T db mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE}
+
+# Restore files (if needed)
+docker cp ./wp-content-backup.tar.gz wp-dev_wordpress-prod_1:/tmp/
+docker-compose exec wordpress-prod bash -c "cd / && tar -xzf /tmp/wp-content-backup.tar.gz"
 ```
 
 ## Server Setup

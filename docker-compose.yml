@@ -56,32 +56,51 @@ services:
     restart: "no"
 
   # Production environment (uncomment when ready for production)
-  # wordpress-prod:
-  #   build:
-  #     context: .
-  #     target: production
-  #   image: tortoisewolfe/buddypress-allyship:latest
-  #   depends_on:
-  #     - db
-  #   ports:
-  #     - "80:80"
-  #   environment:
-  #     WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-  #     WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-  #     WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-  #     WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-  #     WORDPRESS_CONFIG_EXTRA: |
-  #       define('WP_DEBUG', false);
-  #       define('WP_MEMORY_LIMIT', '256M');
-  #       define('WP_AUTO_UPDATE_CORE', false);
-  #   volumes:
-  #     - wp_prod_data:/var/www/html
-  #   restart: always
-  #   healthcheck:
-  #     test: ["CMD", "wp", "core", "is-installed", "--allow-root"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 3
+  wordpress-prod:
+    build:
+      context: .
+      target: production
+    image: tortoisewolfe/buddypress-allyship:latest
+    depends_on:
+      - db
+    ports:
+      - "80:80"
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WP_SITE_URL: ${WP_SITE_URL}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_DEBUG', false);
+        define('WP_MEMORY_LIMIT', '256M');
+        define('WP_AUTO_UPDATE_CORE', false);
+    volumes:
+      - wp_prod_data:/var/www/html
+    restart: always
+    healthcheck:
+      test: ["CMD", "wp", "core", "is-installed", "--allow-root"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    
+  wp-prod-setup:
+    image: tortoisewolfe/buddypress-allyship:latest
+    depends_on:
+      - wordpress-prod
+    environment:
+      WP_SITE_URL: ${WP_SITE_URL}
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+    volumes:
+      - wp_prod_data:/var/www/html
+    command: >
+      bash -c "sleep 15 &&
+              wp option update siteurl ${WP_SITE_URL} --allow-root &&
+              wp option update home ${WP_SITE_URL} --allow-root"
+    restart: "no"
 
 volumes:
   db_data:
