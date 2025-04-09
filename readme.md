@@ -30,31 +30,14 @@ cd wp-dev
 
 ### 2. Setting Up SSH Keys
 
-To access the repository:
+Generate and configure an SSH key for repository access:
 
-1. Generate an Ed25519 SSH key (GitHub's current security best practice):
-   ```bash
-   ssh-keygen -t ed25519 -C "your.email@example.com"
-   ```
-
-2. Start the ssh-agent in the background and add your key:
-   ```bash
-   eval "$(ssh-agent -s)"
-   ssh-add ~/.ssh/id_ed25519
-   ```
-
-3. Add the SSH key to your GitHub account:
-   - Copy your public key:
-     ```bash
-     cat ~/.ssh/id_ed25519.pub
-     ```
-   - Go to GitHub → Settings → SSH and GPG keys → New SSH key
-   - Paste your key and save
-
-4. Verify your connection:
-   ```bash
-   ssh -T git@github.com
-   ```
+```bash
+ssh-keygen -t ed25519 -C "your.email@example.com"
+eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub  # Copy this to GitHub → Settings → SSH keys
+ssh -T git@github.com      # Verify connection
+```
 
 ### 3. Configure Environment Variables
 
@@ -113,12 +96,7 @@ docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh
 
 **Important Note**: The script must be run from inside the container using the path above. It will not work if you try to run it directly from your host machine.
 
-This will create:
-- 20 example users with Latin names
-- 20 sample posts with comments and replies
-- 5 BuddyPress groups with members and activities (if BuddyPress is active)
-- 5 sample pages with philosophical content
-- Example messages to admin (if BuddyPress Messages is active)
+This will populate the site with sample users, posts, BuddyPress content, and messages.
 
 ### Modifying Script Files
 
@@ -166,68 +144,45 @@ docker-compose up -d
 
 ### GitHub Token for Pulling Images
 
-You need a GitHub Personal Access Token to pull images from GitHub Container Registry on your production server:
+Create a GitHub Personal Access Token for accessing the Container Registry:
 
-1. Go to GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
-2. Click "Generate new token"
-3. Give it a descriptive name like "Container Registry Access"
-4. Set an expiration date (recommend 90 days)
-5. Under Repository access, select "Only select repositories" and choose your wp-dev repository
-6. Under Permissions → Repository permissions:
-   - Set "Packages" to "Read"
-7. Click "Generate token"
-8. **IMPORTANT**: Copy the token immediately (you won't be able to see it again)
+1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+2. Generate a new token named "Container Registry Access" (90 day expiration)
+3. Repository access: "Only select repositories" → select wp-dev repository
+4. Permissions: Set "Packages" to "Read"
+5. **IMPORTANT**: Copy the token immediately after generation
 
-#### Setting up the token on your production server:
+Add the token to your production server:
 
 ```bash
-# Option 1: Add to your .env file (recommended)
-# The GITHUB_TOKEN variable is already included in the .env.example
-# Just add your actual token value when setting up your .env file
+# Add to .env file (recommended)
 nano /var/www/wp-dev/.env
-# Find the GITHUB_TOKEN line and replace with your actual token
 GITHUB_TOKEN=ghp_your_personal_access_token_here
 
-# Option 2: Set token for current session only 
-export GITHUB_TOKEN=ghp_your_personal_access_token_here
-```
-
-Make sure your .env file has proper permissions:
-```bash
-chmod 600 /var/www/wp-dev/.env  # Restrict permissions for security
+# Secure the file
+chmod 600 /var/www/wp-dev/.env
 ```
 
 ### Production Server Deployment
 
-After GitHub Actions builds the image, perform these steps on your production server:
+Deploy to production after GitHub Actions builds the image:
 
 ```bash
-# ON YOUR PRODUCTION SERVER
-# Clone the repository (if this is the first deployment)
+# First-time setup
 git clone https://github.com/TortoiseWolfe/wp-dev.git /var/www/wp-dev
 cd /var/www/wp-dev
 
-# If already cloned, update to the latest version
-git fetch origin
-git checkout main
-git pull origin main
+# OR update existing deployment
+git fetch origin && git checkout main && git pull origin main
 
-# Create and configure the .env file for production
-cp .env.example .env
-nano .env  # Edit with production values
+# Configure environment
+cp .env.example .env && nano .env  # Edit with production values
 
-# GitHub token should be in your .env file
-# Authenticate with GitHub Container Registry
+# Deploy containers
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-
-# Pull the latest production image 
 docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
-
-# Launch production services using Docker Compose
 docker-compose up -d wordpress-prod wp-prod-setup db
-
-# Verify everything is running correctly
-docker-compose ps
+docker-compose ps  # Verify status
 ```
 
 ### Automated Deployment Script (For Production Server)
@@ -360,7 +315,7 @@ To restore from backup:
 # Restore database
 cat backup-20250408.sql | docker-compose exec -T db mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE}
 
-# Restore files (if needed)
+# Restore files
 docker cp ./wp-content-backup-20250408.tar.gz wp-dev_wordpress-prod_1:/tmp/
 docker-compose exec wordpress-prod bash -c "cd / && tar -xzf /tmp/wp-content-backup-20250408.tar.gz"
 ```
@@ -383,7 +338,7 @@ WP_ADMIN_EMAIL=admin@your-domain.com          # Use your domain email
 
 ### Version Control for Production
 
-For better control and rollback capability, use versioned tags:
+Use versioned tags for better rollback capability:
 
 ```bash
 # ON YOUR LOCAL MACHINE
@@ -400,115 +355,117 @@ docker pull ghcr.io/tortoisewolfe/buddypress-allyship:v1.2.3
 
 ## Server Setup
 
-### Server Preparation with EnhancedBoot
+### Setting Up VS Code with Remote SSH for GCP
 
-For production environments, use the comprehensive server bootstrap script to:
-- Update system packages with robust retry mechanisms
-- Install and configure Docker with proper security settings
-- Configure swap space for better performance
-- Add security hardening measures
-- Prepare optimal WordPress environment settings
-- Create a default .env file with configuration values
+This guide walks you through connecting VS Code to a GCP Linux VM for seamless remote development.
 
-To use the script on a new server:
+#### 1. Install Required Software
+
+- Download and install [VS Code](https://code.visualstudio.com/)
+- Install the **Remote - SSH** extension (or full Remote Development pack) via the Extensions sidebar (`Ctrl+Shift+X`)
+
+#### 2. Prepare SSH Key
+
+If you don't have an SSH key for GCP:
 
 ```bash
-# Copy the script to the server
-scp EnhancedBoot/enhanced-boot.sh user@server:/tmp/
+ssh-keygen -t ed25519 -C "your.email@example.com"
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+```
 
-# Connect to the server and run the script
+#### 3. Configure SSH Access
+
+Create/edit `~/.ssh/config`:
+
+```ssh-config
+Host my-gcp-instance
+    HostName YOUR_GCP_EXTERNAL_IP
+    User YOUR_SSH_USERNAME
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+```
+
+- Replace placeholders with your GCP instance IP and username
+- Secure your config with `chmod 600 ~/.ssh/config`
+
+#### 4. Connect VS Code to GCP
+
+1. Press `F1` (or `Ctrl+Shift+P`) and select **Remote-SSH: Connect to Host**
+2. Choose your configured host (`my-gcp-instance`)
+3. Select the appropriate Linux distribution if prompted
+4. Wait for VS Code server installation on the remote host
+
+#### 5. Work with Remote Files
+
+- Use File Explorer to navigate to your project folder on GCP
+- Edit files directly on the remote system
+- Use the integrated terminal (`` Ctrl+` ``) to run commands on the GCP instance
+
+#### 6. Managing Your Connection
+
+- **Disconnect**: Close the VS Code window
+- **Reconnect**: Use the Remote-SSH command again
+
+### Server Preparation with EnhancedBoot
+
+Use this bootstrap script for new production servers:
+
+```bash
+# Copy and run the script
+scp EnhancedBoot/enhanced-boot.sh user@server:/tmp/
 ssh user@server
 sudo bash /tmp/enhanced-boot.sh
 ```
 
-The script creates detailed logs at `/tmp/enhanced-boot.log` for troubleshooting.
+The script automatically:
+- Updates system packages
+- Installs Docker with security settings
+- Configures swap space
+- Sets up WordPress environment
+- Creates logs at `/tmp/enhanced-boot.log`
 
 #### Environment Configuration for Production
 
-The enhanced-boot.sh script automatically creates a `.env` file in `/var/www/wp-dev/` with default configuration values. After running the script:
+The script creates a default `.env` file in `/var/www/wp-dev/`. Configure it:
 
-1. **Edit the environment variables:**
-   ```bash
-   sudo nano /var/www/wp-dev/.env
-   ```
+```bash
+# Edit environment variables
+sudo nano /var/www/wp-dev/.env
 
-2. **Load environment variables in your session:**
-   ```bash
-   source /var/www/wp-dev/.env
-   ```
+# Load variables in your session
+source /var/www/wp-dev/.env
 
-3. **Use the environment variables with Docker:**
-   ```bash
-   # Launch with environment variables from the file
-   docker-compose --env-file /var/www/wp-dev/.env up -d
-   ```
+# Launch with environment variables
+docker-compose --env-file /var/www/wp-dev/.env up -d
 
-4. **For automation scripts, reference the file:**
-   ```bash
-   # In your scripts, read values from the .env file
-   if [ -f "/var/www/wp-dev/.env" ]; then
-       source /var/www/wp-dev/.env
-   fi
-   ```
+# In automation scripts
+if [ -f "/var/www/wp-dev/.env" ]; then
+    source /var/www/wp-dev/.env
+fi
+```
 
-Make sure to update critical values such as database passwords, admin credentials, and the site URL before deploying your application.
+Always update passwords, credentials, and site URL before deployment.
 
 ### Security Considerations
 
-The production image includes:
-- Minimal installed packages
-- Proper file permissions
-- Non-root user operation
-- Apache security configuration
-- Health checks
-
-The EnhancedBoot script provides additional server-level security:
-- Package update and management system
-- Controlled Docker installation procedure
-- Robust error handling and logging
-- Swap space configuration for performance
-- Server timezone and environment configuration
-
-Additional security measures to implement:
-- UFW firewall configuration
-- SSH hardening
-- Password policies
-- Regular security updates
+The production environment includes:
+- **Container security**: Minimal packages, proper permissions, non-root operation
+- **Server security**: Automated updates, controlled Docker installation, error handling
+- **Recommended additions**: UFW firewall, SSH hardening, password policies
 
 #### Security Monitoring Commands
 
-Check who has successfully logged into the server (with count):
-```bash
-sudo grep "Accepted" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr
-```
+Key commands for monitoring server security:
 
-Review failed login attempts (grouped by username and IP with count):
 ```bash
-sudo grep "Failed password" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr
-```
+# Check login activity
+sudo grep "Accepted" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr  # Successful logins
+sudo grep "Failed password" /var/log/auth.log | awk '{print $9,$11}' | sort | uniq -c | sort -nr  # Failed attempts
+who  # Current logged-in users
+last | head -20  # Recent login history
 
-Count total successful logins:
-```bash
-sudo grep "Accepted" /var/log/auth.log | wc -l
-```
-
-Count total failed login attempts:
-```bash
-sudo grep "Failed password" /var/log/auth.log | wc -l
-```
-
-Monitor current logged-in users:
-```bash
-who
-```
-
-Check user login history (most recent first):
-```bash
-last | head -20
-```
-
-Quick security summary report:
-```bash
+# Comprehensive security summary
 echo "=== SECURITY LOGIN SUMMARY ===" && \
 echo "Total successful logins: $(sudo grep "Accepted" /var/log/auth.log | wc -l)" && \
 echo "Total failed attempts: $(sudo grep "Failed password" /var/log/auth.log | wc -l)" && \
@@ -520,69 +477,40 @@ sudo grep "Failed password" /var/log/auth.log | awk '{print $9,$11}' | sort | un
 
 ## Git Workflow
 
-### Branching Strategy
+```bash
+# Create feature branch
+git checkout main && git pull
+git checkout -b feature/your-feature-name
 
-1. Always create feature branches from main:
-   ```bash
-   git checkout main
-   git pull
-   git checkout -b feature/your-feature-name
-   ```
+# Make changes and commit
+git add .
+git commit -m "Descriptive commit message"
+git push -u origin feature/your-feature-name
 
-2. Make your changes and commit them:
-   ```bash
-   git add .
-   git commit -m "Descriptive commit message"
-   ```
+# After PR approval and merge
+git checkout main && git pull
+git branch -d feature/your-feature-name
+```
 
-3. Push your branch to remote:
-   ```bash
-   git push -u origin feature/your-feature-name
-   ```
-
-### Creating Pull Requests
-
-1. Go to the repository on GitHub
-2. Click "Pull Requests" → "New Pull Request"
-3. Select your branch and the target branch (main)
-4. Fill in the PR template with:
-   - Description of changes
-   - Testing instructions
-   - Screenshots (if applicable)
-5. Request reviews from team members
-
-### Reviewing and Merging
-
-1. Address any feedback from reviewers
-2. Once approved, merge the PR on GitHub
-3. Delete the feature branch after merging:
-   ```bash
-   git checkout main
-   git pull
-   git branch -d feature/your-feature-name
-   ```
+For PRs:
+1. GitHub → Pull Requests → New Pull Request
+2. Select your branch → main
+3. Include: description, testing instructions, screenshots
+4. Request reviews
 
 ## Troubleshooting
 
-- **Container issues**: Try `docker-compose down -v` followed by `docker-compose up -d`
-- **Database connection errors**: 
-  - Check that MYSQL_PASSWORD and WORDPRESS_DB_PASSWORD match in the .env file
-  - Verify all environment variables are properly set in docker-compose.yml
-  - Check logs with `docker-compose logs db` and `docker-compose logs wordpress`
-- **WordPress configuration**: Examine setup.sh for the installation process
-- **Missing plugins or themes**: Check logs with `docker logs [container-id]`
-- **Performance issues**: Consider implementing a caching solution
-- **Docker installation problems**: Check detailed logs at `/tmp/enhanced-boot.log`
-- **"Access denied for user" errors**: Ensure that password values match between MySQL and WordPress settings
-- **Docker permission denied errors**:
-  - Error: `permission denied while trying to connect to the Docker daemon socket`
-  - Solution: Either use `sudo` with Docker commands or add your user to the docker group:
-    ```bash
-    sudo usermod -aG docker $USER && newgrp docker
-    ```
-- **GitHub Container Registry access denied**:
-  - Error: `denied: denied` when pulling images
-  - Solution: Authenticate with a personal access token as described in the [GitHub Container Registry section](#1-github-container-registry-automated)
+- **Container issues**: `docker-compose down -v && docker-compose up -d`
+- **Database errors**: 
+  - Verify passwords match in .env
+  - Check logs: `docker-compose logs db`
+- **WordPress errors**: Examine setup.sh and `docker logs [container-id]`
+- **Docker permission denied**: 
+  ```bash
+  sudo usermod -aG docker $USER && newgrp docker
+  ```
+- **GitHub Registry access denied**: Authenticate with token from [GitHub Token section](#github-token-for-pulling-images)
+- **Docker installation issues**: Check logs at `/tmp/enhanced-boot.log`
 
 ## Additional Resources
 
