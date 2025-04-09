@@ -30,14 +30,45 @@ cd wp-dev
 
 ### 2. Setting Up SSH Keys
 
-Generate and configure an SSH key for repository access:
+Generate and configure SSH keys for both GitHub repository access and remote development:
 
 ```bash
+# Generate SSH key (if you don't have one already)
 ssh-keygen -t ed25519 -C "your.email@example.com"
 eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519
+
+# For GitHub repository access
 cat ~/.ssh/id_ed25519.pub  # Copy this to GitHub → Settings → SSH keys
 ssh -T git@github.com      # Verify connection
+
+# For GCP VM remote development
+# 1. Copy the same public key to your GCP VM's authorized_keys with either:
+#    Option A: Using ssh-copy-id (easiest method):
+#    ssh-copy-id -i ~/.ssh/id_ed25519.pub YOUR_USERNAME@YOUR_GCP_EXTERNAL_IP
+#
+#    Option B: Manual method (if ssh-copy-id isn't available):
+#    cat ~/.ssh/id_ed25519.pub | ssh YOUR_USERNAME@YOUR_GCP_EXTERNAL_IP "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+#
+#    Option C: Via Google Cloud Console:
+#    - Go to Compute Engine > VM instances
+#    - Click on your VM > Edit
+#    - Under "SSH Keys", click "Add item" and paste your public key
+#
+# 2. Configure SSH access in ~/.ssh/config:
+
+# Host my-gcp-instance
+#     HostName YOUR_GCP_EXTERNAL_IP
+#     User YOUR_SSH_USERNAME
+#     IdentityFile ~/.ssh/id_ed25519
+#     IdentitiesOnly yes
+
+# 3. Secure your config with: chmod 600 ~/.ssh/config
 ```
+
+For VS Code remote development with your GCP VM:
+1. Install the Remote-SSH extension in VS Code
+2. Press F1 (or Ctrl+Shift+P) and select "Remote-SSH: Connect to Host"
+3. Choose your configured host and start developing remotely
 
 ### 3. Configure Environment Variables
 
@@ -354,58 +385,6 @@ docker pull ghcr.io/tortoisewolfe/buddypress-allyship:v1.2.3
 ```
 
 ## Server Setup
-
-### Setting Up VS Code with Remote SSH for GCP
-
-This guide walks you through connecting VS Code to a GCP Linux VM for seamless remote development.
-
-#### 1. Install Required Software
-
-- Download and install [VS Code](https://code.visualstudio.com/)
-- Install the **Remote - SSH** extension (or full Remote Development pack) via the Extensions sidebar (`Ctrl+Shift+X`)
-
-#### 2. Prepare SSH Key
-
-If you don't have an SSH key for GCP:
-
-```bash
-ssh-keygen -t ed25519 -C "your.email@example.com"
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519
-```
-
-#### 3. Configure SSH Access
-
-Create/edit `~/.ssh/config`:
-
-```ssh-config
-Host my-gcp-instance
-    HostName YOUR_GCP_EXTERNAL_IP
-    User YOUR_SSH_USERNAME
-    IdentityFile ~/.ssh/id_ed25519
-    IdentitiesOnly yes
-```
-
-- Replace placeholders with your GCP instance IP and username
-- Secure your config with `chmod 600 ~/.ssh/config`
-
-#### 4. Connect VS Code to GCP
-
-1. Press `F1` (or `Ctrl+Shift+P`) and select **Remote-SSH: Connect to Host**
-2. Choose your configured host (`my-gcp-instance`)
-3. Select the appropriate Linux distribution if prompted
-4. Wait for VS Code server installation on the remote host
-
-#### 5. Work with Remote Files
-
-- Use File Explorer to navigate to your project folder on GCP
-- Edit files directly on the remote system
-- Use the integrated terminal (`` Ctrl+` ``) to run commands on the GCP instance
-
-#### 6. Managing Your Connection
-
-- **Disconnect**: Close the VS Code window
-- **Reconnect**: Use the Remote-SSH command again
 
 ### Server Preparation with EnhancedBoot
 
