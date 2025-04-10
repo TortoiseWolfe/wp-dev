@@ -402,11 +402,64 @@ The script automatically:
 - Installs Docker with security settings
 - Configures swap space
 - Sets up WordPress environment
+- Retrieves secrets from Google Secret Manager
 - Creates logs at `/tmp/enhanced-boot.log`
+
+#### Google Secret Manager Setup
+
+For the script to access secrets from Google Secret Manager:
+
+1. **Create the necessary secrets in Google Secret Manager**:
+   ```bash
+   # Create secrets (run these commands from a machine with gcloud installed)
+   gcloud secrets create MYSQL_ROOT_PASSWORD --replication-policy="automatic"
+   gcloud secrets create MYSQL_PASSWORD --replication-policy="automatic"
+   gcloud secrets create WP_ADMIN_PASSWORD --replication-policy="automatic"
+   gcloud secrets create WP_ADMIN_EMAIL --replication-policy="automatic"
+   gcloud secrets create GITHUB_TOKEN --replication-policy="automatic"
+   
+   # Add secret values
+   echo -n "your-secure-root-password" | gcloud secrets versions add MYSQL_ROOT_PASSWORD --data-file=-
+   echo -n "your-secure-db-password" | gcloud secrets versions add MYSQL_PASSWORD --data-file=-
+   echo -n "your-secure-admin-password" | gcloud secrets versions add WP_ADMIN_PASSWORD --data-file=-
+   echo -n "admin@yourdomain.com" | gcloud secrets versions add WP_ADMIN_EMAIL --data-file=-
+   echo -n "ghp_your_github_token" | gcloud secrets versions add GITHUB_TOKEN --data-file=-
+   ```
+
+2. **Grant VM access to Secret Manager**:
+   
+   **Option A: When creating a new VM**:
+   ```bash
+   # Create VM with Secret Manager access
+   gcloud compute instances create wordpress-vm \
+     --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
+     --scopes=https://www.googleapis.com/auth/cloud-platform
+   ```
+
+   **Option B: For existing VM**:
+   ```bash
+   # Set permissions on Google Cloud Console
+   # 1. Go to: IAM & Admin > Service Accounts
+   # 2. Find your VM's service account (or create a new one)
+   # 3. Grant it the 'Secret Manager Secret Accessor' role
+   
+   # Then attach this service account to your VM:
+   gcloud compute instances set-service-account wordpress-vm \
+     --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
+     --scopes=https://www.googleapis.com/auth/cloud-platform
+   ```
+
+3. **Verify Permissions**: Test secret access before running the full script
+   ```bash
+   # SSH into your VM and verify access
+   gcloud auth login
+   gcloud config set project YOUR_PROJECT
+   gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD"
+   ```
 
 #### Environment Configuration for Production
 
-The script creates a default `.env` file in `/var/www/wp-dev/`. Configure it:
+The script creates a `.env` file in `/var/www/wp-dev/` populated with values from Secret Manager. If needed, you can manually configure it:
 
 ```bash
 # Edit environment variables
