@@ -42,46 +42,28 @@ cat ~/.ssh/id_ed25519.pub  # Copy this to GitHub → Settings → SSH keys
 ssh -T git@github.com      # Verify connection
 
 # For GCP VM remote development
-# 1. Copy the same public key to your GCP VM's authorized_keys with either:
-#    Option A: Using ssh-copy-id (easiest method):
-#    ssh-copy-id -i ~/.ssh/id_ed25519.pub YOUR_USERNAME@YOUR_GCP_EXTERNAL_IP
-#
-#    Option B: Manual method (if ssh-copy-id isn't available):
-#    cat ~/.ssh/id_ed25519.pub | ssh YOUR_USERNAME@YOUR_GCP_EXTERNAL_IP "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-#
-#    Option C: Via Google Cloud Console:
-#    - Go to Compute Engine > VM instances
-#    - Click on your VM > Edit
-#    - Under "SSH Keys", click "Add item" and paste your public key
-#
-# 2. Configure SSH access in ~/.ssh/config:
+# Option A: Using ssh-copy-id
+ssh-copy-id -i ~/.ssh/id_ed25519.pub YOUR_USERNAME@YOUR_GCP_EXTERNAL_IP
 
+# Option B: Manual method
+cat ~/.ssh/id_ed25519.pub | ssh YOUR_USERNAME@YOUR_GCP_EXTERNAL_IP "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+
+# Option C: Via Google Cloud Console - UI steps
+
+# Configure SSH config example
 # Host my-gcp-instance
 #     HostName YOUR_GCP_EXTERNAL_IP
 #     User YOUR_SSH_USERNAME
 #     IdentityFile ~/.ssh/id_ed25519
 #     IdentitiesOnly yes
 
-# 3. Secure your config with: chmod 600 ~/.ssh/config
+# Secure config
+chmod 600 ~/.ssh/config
 ```
-
-For VS Code remote development with your GCP VM:
-1. Install the Remote-SSH extension in VS Code
-2. Press F1 (or Ctrl+Shift+P) and select "Remote-SSH: Connect to Host"
-3. Choose your configured host and start developing remotely
-
-### 3. Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
-
-Edit the `.env` file to customize:
-- Database credentials
-- WordPress admin account
-- Site URL and title
-
-### 4. Start the Development Environment
 
 ```bash
 docker-compose up -d
@@ -112,26 +94,13 @@ This will:
 docker-compose exec wordpress wp --allow-root [command]
 ```
 
-Example:
 ```bash
 docker-compose exec wordpress wp --allow-root plugin list
 ```
 
-### Populating Demo Content
-
-To add example users, posts, comments, pages, and BuddyPress content:
-
 ```bash
 docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh
 ```
-
-**Important Note**: The script must be run from inside the container using the path above. It will not work if you try to run it directly from your host machine.
-
-This will populate the site with sample users, posts, BuddyPress content, and messages.
-
-### Modifying Script Files
-
-When modifying scripts in `devscripts/` or `setup.sh`, you MUST rebuild from scratch:
 
 ```bash
 docker-compose down -v && docker image prune -a -f && docker-compose build && docker-compose up -d
@@ -149,11 +118,11 @@ This repository is configured with GitHub Actions to automatically build and pub
 
 1. **On your local machine**:
    - Make your changes and push to main
-   ```bash
-   git add .
-   git commit -m "Your meaningful commit message"
-   git push origin main
-   ```
+```bash
+git add .
+git commit -m "Your meaningful commit message"
+git push origin main
+```
    - GitHub Actions automatically builds and pushes the Docker image
    - Monitor the build in the "Actions" tab of your GitHub repository
 
@@ -302,32 +271,26 @@ To use this script:
 To upgrade your production environment:
 
 1. Build and push a new image (from your local development machine):
-   ```bash
-   # ON YOUR LOCAL MACHINE
-   # Update your code, then build and push a new image
-   docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:latest .
-   docker push ghcr.io/tortoisewolfe/buddypress-allyship:latest
-   ```
+```bash
+# ON YOUR LOCAL MACHINE
+# Update your code, then build and push a new image
+docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:latest .
+docker push ghcr.io/tortoisewolfe/buddypress-allyship:latest
+```
 
 2. On the production server, either:
-   ```bash
-   # ON YOUR PRODUCTION SERVER
-   # Option 1: Run the deployment script
-   ./deploy-prod.sh
-   
-   # Option 2: Or manually pull and restart
-   cd /var/www/wp-dev
-   git pull  # Update docker-compose.yml and scripts if needed
-   docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
-   docker-compose down wordpress-prod wp-prod-setup
-   docker-compose up -d wordpress-prod wp-prod-setup
-   ```
+```bash
+# ON YOUR PRODUCTION SERVER
+# Option 1: Run the deployment script
+./deploy-prod.sh
 
-For major updates that require data migration, always create a backup first (see [Backup Strategy](#backup-strategy)).
-
-### Backup Strategy
-
-Always backup before upgrading:
+# Option 2: Or manually pull and restart
+cd /var/www/wp-dev
+git pull  # Update docker-compose.yml and scripts if needed
+docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
+docker-compose down wordpress-prod wp-prod-setup
+docker-compose up -d wordpress-prod wp-prod-setup
+```
 
 ```bash
 # ON YOUR PRODUCTION SERVER
@@ -338,8 +301,6 @@ docker-compose exec db mysqldump -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABA
 docker-compose exec wordpress-prod tar -czf /tmp/wp-content-backup-$(date +%Y%m%d).tar.gz /var/www/html/wp-content
 docker cp wp-dev_wordpress-prod_1:/tmp/wp-content-backup-$(date +%Y%m%d).tar.gz ./wp-content-backup-$(date +%Y%m%d).tar.gz
 ```
-
-To restore from backup:
 
 ```bash
 # ON YOUR PRODUCTION SERVER
@@ -410,52 +371,52 @@ The script automatically:
 For the script to access secrets from Google Secret Manager:
 
 1. **Create the necessary secrets in Google Secret Manager**:
-   ```bash
-   # Create secrets (run these commands from a machine with gcloud installed)
-   gcloud secrets create MYSQL_ROOT_PASSWORD --replication-policy="automatic"
-   gcloud secrets create MYSQL_PASSWORD --replication-policy="automatic"
-   gcloud secrets create WP_ADMIN_PASSWORD --replication-policy="automatic"
-   gcloud secrets create WP_ADMIN_EMAIL --replication-policy="automatic"
-   gcloud secrets create GITHUB_TOKEN --replication-policy="automatic"
-   
-   # Add secret values
-   echo -n "your-secure-root-password" | gcloud secrets versions add MYSQL_ROOT_PASSWORD --data-file=-
-   echo -n "your-secure-db-password" | gcloud secrets versions add MYSQL_PASSWORD --data-file=-
-   echo -n "your-secure-admin-password" | gcloud secrets versions add WP_ADMIN_PASSWORD --data-file=-
-   echo -n "admin@yourdomain.com" | gcloud secrets versions add WP_ADMIN_EMAIL --data-file=-
-   echo -n "ghp_your_github_token" | gcloud secrets versions add GITHUB_TOKEN --data-file=-
-   ```
+```bash
+# Create secrets (run these commands from a machine with gcloud installed)
+gcloud secrets create MYSQL_ROOT_PASSWORD --replication-policy="automatic"
+gcloud secrets create MYSQL_PASSWORD --replication-policy="automatic"
+gcloud secrets create WP_ADMIN_PASSWORD --replication-policy="automatic"
+gcloud secrets create WP_ADMIN_EMAIL --replication-policy="automatic"
+gcloud secrets create GITHUB_TOKEN --replication-policy="automatic"
+
+# Add secret values
+echo -n "your-secure-root-password" | gcloud secrets versions add MYSQL_ROOT_PASSWORD --data-file=-
+echo -n "your-secure-db-password" | gcloud secrets versions add MYSQL_PASSWORD --data-file=-
+echo -n "your-secure-admin-password" | gcloud secrets versions add WP_ADMIN_PASSWORD --data-file=-
+echo -n "admin@yourdomain.com" | gcloud secrets versions add WP_ADMIN_EMAIL --data-file=-
+echo -n "ghp_your_github_token" | gcloud secrets versions add GITHUB_TOKEN --data-file=-
+```
 
 2. **Grant VM access to Secret Manager**:
    
    **Option A: When creating a new VM**:
-   ```bash
-   # Create VM with Secret Manager access
-   gcloud compute instances create wordpress-vm \
-     --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
-     --scopes=https://www.googleapis.com/auth/cloud-platform
-   ```
+```bash
+# Create VM with Secret Manager access
+gcloud compute instances create wordpress-vm \
+  --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
+  --scopes=https://www.googleapis.com/auth/cloud-platform
+```
 
    **Option B: For existing VM**:
-   ```bash
-   # Set permissions on Google Cloud Console
-   # 1. Go to: IAM & Admin > Service Accounts
-   # 2. Find your VM's service account (or create a new one)
-   # 3. Grant it the 'Secret Manager Secret Accessor' role
-   
-   # Then attach this service account to your VM:
-   gcloud compute instances set-service-account wordpress-vm \
-     --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
-     --scopes=https://www.googleapis.com/auth/cloud-platform
-   ```
+```bash
+# Set permissions on Google Cloud Console
+# 1. Go to: IAM & Admin > Service Accounts
+# 2. Find your VM's service account (or create a new one)
+# 3. Grant it the 'Secret Manager Secret Accessor' role
+
+# Then attach this service account to your VM:
+gcloud compute instances set-service-account wordpress-vm \
+  --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
+  --scopes=https://www.googleapis.com/auth/cloud-platform
+```
 
 3. **Verify Permissions**: Test secret access before running the full script
-   ```bash
-   # SSH into your VM and verify access
-   gcloud auth login
-   gcloud config set project YOUR_PROJECT
-   gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD"
-   ```
+```bash
+# SSH into your VM and verify access
+gcloud auth login
+gcloud config set project YOUR_PROJECT
+gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD"
+```
 
 #### Environment Configuration for Production
 
@@ -524,23 +485,18 @@ git checkout main && git pull
 git branch -d feature/your-feature-name
 ```
 
-For PRs:
-1. GitHub → Pull Requests → New Pull Request
-2. Select your branch → main
-3. Include: description, testing instructions, screenshots
-4. Request reviews
-
 ## Troubleshooting
 
-- **Container issues**: `docker-compose down -v && docker-compose up -d`
-- **Database errors**: 
-  - Verify passwords match in .env
-  - Check logs: `docker-compose logs db`
-- **WordPress errors**: Examine setup.sh and `docker logs [container-id]`
-- **Docker permission denied**: 
-  ```bash
-  sudo usermod -aG docker $USER && newgrp docker
-  ```
+```bash
+# Container issues
+docker-compose down -v && docker-compose up -d
+
+# Database errors
+docker-compose logs db
+
+# Docker permission denied
+sudo usermod -aG docker $USER && newgrp docker
+```
 - **GitHub Registry access denied**: Authenticate with token from [GitHub Token section](#github-token-for-pulling-images)
 - **Docker installation issues**: Check logs at `/tmp/enhanced-boot.log`
 

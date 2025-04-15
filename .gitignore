@@ -30,3 +30,9 @@ bower_components/
 
 # Exclude Composer dependencies (if installed locally and not needed in the repository)
 vendor/
+
+# SSL certificates - DO NOT COMMIT THESE!
+nginx/ssl/*.key
+nginx/ssl/*.crt
+nginx/ssl/live/
+nginx/ssl/renewal-hooks/

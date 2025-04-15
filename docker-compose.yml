@@ -12,6 +12,8 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     restart: always
+    networks:
+      - wordpress_network
 
   # Development environment
   wordpress:
@@ -21,8 +23,8 @@ services:
     image: mywordpress:dev
     depends_on:
       - db
-    ports:
-      - "8000:80"
+    expose:
+      - "80"
     environment:
       WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
@@ -31,6 +33,8 @@ services:
     volumes:
       - wp_data:/var/www/html
     restart: always
+    networks:
+      - wordpress_network
 
   wp-setup:
     image: mywordpress:dev
@@ -54,8 +58,10 @@ services:
               sleep 10 && 
               /usr/local/bin/devscripts/demo-content.sh"
     restart: "no"
+    networks:
+      - wordpress_network
 
-  # Production environment (uncomment when ready for production)
+  # Production environment
   wordpress-prod:
     build:
       context: .
@@ -63,8 +69,8 @@ services:
     image: tortoisewolfe/buddypress-allyship:latest
     depends_on:
       - db
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     environment:
       WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
@@ -75,6 +81,7 @@ services:
         define('WP_DEBUG', false);
         define('WP_MEMORY_LIMIT', '256M');
         define('WP_AUTO_UPDATE_CORE', false);
+        define('FORCE_SSL_ADMIN', true);
     volumes:
       - wp_prod_data:/var/www/html
     restart: always
@@ -83,6 +90,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - wordpress_network
     
   wp-prod-setup:
     image: tortoisewolfe/buddypress-allyship:latest
@@ -101,8 +110,45 @@ services:
               wp option update siteurl ${WP_SITE_URL} --allow-root &&
               wp option update home ${WP_SITE_URL} --allow-root"
     restart: "no"
+    networks:
+      - wordpress_network
+
+  # Nginx reverse proxy with SSL termination
+  nginx:
+    image: nginx:1.25
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - certbot_data:/var/www/certbot
+    depends_on:
+      - wordpress
+      - wordpress-prod
+    restart: always
+    networks:
+      - wordpress_network
+
+  # Certbot for SSL certificate generation and renewal
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_data:/var/www/certbot
+      - ./nginx/ssl:/etc/letsencrypt
+    depends_on:
+      - nginx
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    restart: unless-stopped
+    networks:
+      - wordpress_network
 
 volumes:
   db_data:
   wp_data:
   wp_prod_data:
+  certbot_data:
+
+networks:
+  wordpress_network:
+    driver: bridge
