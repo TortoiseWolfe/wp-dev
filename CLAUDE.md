@@ -1,5 +1,13 @@
 # WordPress Development Environment Guidelines
 
+## Production Image with Security Hardening
+- Security-hardened production image with Apache security configurations
+- Nginx reverse proxy with SSL termination for HTTPS support
+- Versioned image tagging for reliable deployment and rollback
+- Container Registry: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+- Reduced attack surface with minimal packages and proper permissions
+- Health checks for container orchestration reliability
+
 ## Current Configuration
 - COMPLETED: Gamification features for BuddyPress tutorials
 - COMPLETED: Simple demo of gamification in BuddyPress with BuddyX theme  
@@ -19,11 +27,24 @@
 - `docker-compose exec wordpress bash`: Access WordPress container shell
 - `docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh`: Populate site with demo content
 
-## Running Production Image Locally
-- `docker-compose up -d db`: Start just the database container
-- `docker run -d -p 8888:80 --network wp-dev_default -e WORDPRESS_DB_HOST=db -e WORDPRESS_DB_USER=wordpress -e WORDPRESS_DB_PASSWORD=wordpress -e WORDPRESS_DB_NAME=wordpress -e WP_SITE_URL=http://[WSL-IP]:8888 mywordpress:prod`: Run production image
-- Replace `[WSL-IP]` with your WSL IP address (run `hostname -I | awk '{print $1}'` to get it)
-- Access the production site at http://[WSL-IP]:8888 from your Windows browser
+## Running Hardened Production Image with Nginx
+- Version tagged, security-hardened production images are available in the GitHub Container Registry
+- Production environment includes nginx reverse proxy with SSL termination
+- Example configuration:
+  ```bash
+  # Build and tag a versioned production image
+  docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
+  
+  # Push to GitHub Container Registry (requires authentication with write:packages permission)
+  # Set GITHUB_TOKEN in .env file first
+  echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+  docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+  
+  # Run the full production stack with nginx
+  docker-compose up -d wordpress-prod wp-prod-setup db nginx
+  ```
+- Access the production environment through nginx at http://localhost:80 for HTTP or https://localhost:443 for HTTPS
+- For production, configure proper domain names and valid SSL certificates
 
 ## IMPORTANT: Changes to Script Files
 - Script files are copied into the container during build time
@@ -60,14 +81,18 @@
 
 ### Infrastructure Improvements
 - [x] Fix script permissions (`chmod +x setup.sh EnhancedBoot/enhanced-boot.sh devscripts/demo-content.sh`)
+- [x] Add nginx reverse proxy with SSL termination for production
+- [x] Implement versioned image tagging for better deployment management
 - [ ] Add specific version pinning for dependencies in Dockerfile
 - [ ] Create separate docker-compose.prod.yml for production configuration
 - [ ] Consider using Docker secrets for sensitive data instead of environment variables
 
 ### Security Enhancements
-- [ ] Add HTTPS configuration with Let's Encrypt for production
+- [x] Add HTTPS configuration with Let's Encrypt for production via nginx
+- [x] Implement basic Apache security hardening (ServerTokens, ServerSignature, TraceEnable)
+- [x] Set proper file permissions for WordPress files
 - [ ] Document WordPress security plugins for production
-- [ ] Implement additional Apache/PHP security hardening
+- [ ] Implement additional PHP security configurations
 - [ ] Add firewall configuration examples for production servers
 - [ ] Add comprehensive security scanning in CI/CD pipeline
 

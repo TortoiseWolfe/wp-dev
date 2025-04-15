@@ -66,7 +66,7 @@ services:
     build:
       context: .
       target: production
-    image: tortoisewolfe/buddypress-allyship:latest
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
     depends_on:
       - db
     expose:
@@ -94,7 +94,7 @@ services:
       - wordpress_network
     
   wp-prod-setup:
-    image: tortoisewolfe/buddypress-allyship:latest
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
     depends_on:
       - wordpress-prod
     environment:
@@ -132,7 +132,7 @@ services:
 
   # Certbot for SSL certificate generation and renewal
   certbot:
-    image: certbot/certbot
+    image: certbot/certbot:latest
     volumes:
       - certbot_data:/var/www/certbot
       - ./nginx/ssl:/etc/letsencrypt
@@ -142,6 +142,9 @@ services:
     restart: unless-stopped
     networks:
       - wordpress_network
+    environment:
+      - CERTBOT_EMAIL=${CERTBOT_EMAIL:-admin@example.com}
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
 
 volumes:
   db_data:

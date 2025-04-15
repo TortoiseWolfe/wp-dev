@@ -2,6 +2,30 @@
 
 This repository provides a Docker-based WordPress development environment with BuddyPress installed, supporting both local development and production deployment.
 
+## Hardened Production Image
+
+The v0.1.0 release includes a security-hardened production image with:
+- Nginx reverse proxy with SSL termination
+- Apache security hardening
+- Proper file permissions
+- Docker health checks
+- Container-based Let's Encrypt integration
+
+To use the hardened production image:
+```bash
+# Build the versioned production image locally
+docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
+
+# Push to GitHub Container Registry (requires proper token setup)
+# 1. Create a GitHub PAT with write:packages and read:packages permissions
+# 2. Save token in .env file: GITHUB_TOKEN=your_token_here
+# 3. Login with: echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+# 4. Push: docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+
+# Run the complete hardened production stack
+docker-compose up -d   # Starts all services including nginx and certbot
+```
+
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
@@ -178,10 +202,10 @@ git fetch origin && git checkout main && git pull origin main
 # Configure environment
 cp .env.example .env && nano .env  # Edit with production values
 
-# Deploy containers
+# Deploy the complete hardened production stack
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
-docker-compose up -d wordpress-prod wp-prod-setup db
+docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+docker-compose up -d
 docker-compose ps  # Verify status
 ```
 
@@ -203,7 +227,7 @@ set -o pipefail
 # ----------------------
 PROJECT_DIR="/var/www/wp-dev"                           # Path to your project
 BRANCH="main"                                           # Branch to deploy
-GHCR_IMAGE="ghcr.io/tortoisewolfe/buddypress-allyship:latest"  # Production image
+GHCR_IMAGE="ghcr.io/tortoisewolfe/wp-dev:v0.1.0"  # Production image with versioned tag
 DOCKER_COMPOSE_FILE="${PROJECT_DIR}/docker-compose.yml" # Docker Compose file path
 
 # ----------------------
@@ -249,10 +273,10 @@ echo "$GITHUB_TOKEN" | docker login ghcr.io -u tortoisewolfe --password-stdin
 log "Pulling the latest image ${GHCR_IMAGE}..."
 docker pull "${GHCR_IMAGE}"
 
-# Step 5: Deploy services using Docker Compose
+# Step 5: Deploy the complete hardened production stack
 log "Updating production services using Docker Compose..."
 docker-compose -f "$DOCKER_COMPOSE_FILE" pull
-docker-compose -f "$DOCKER_COMPOSE_FILE" up -d wordpress-prod wp-prod-setup db
+docker-compose -f "$DOCKER_COMPOSE_FILE" up -d  # Deploy all services including nginx and certbot
 
 # Step 6: Verify deployment status
 log "Deployment complete. Verifying running containers..."
@@ -270,26 +294,31 @@ To use this script:
 
 To upgrade your production environment:
 
-1. Build and push a new image (from your local development machine):
+1. Build and push a new versioned image (from your local development machine):
 ```bash
 # ON YOUR LOCAL MACHINE
-# Update your code, then build and push a new image
-docker build --target production -t ghcr.io/tortoisewolfe/buddypress-allyship:latest .
-docker push ghcr.io/tortoisewolfe/buddypress-allyship:latest
+# Update your code, then build and push a new versioned image
+# IMPORTANT: Always use specific version tags, not 'latest'
+docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
+docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
 ```
 
 2. On the production server, either:
 ```bash
 # ON YOUR PRODUCTION SERVER
-# Option 1: Run the deployment script
+# Option 1: Run the deployment script (make sure to update version in the script first)
 ./deploy-prod.sh
 
-# Option 2: Or manually pull and restart
+# Option 2: Or manually pull and restart with the versioned image
 cd /var/www/wp-dev
 git pull  # Update docker-compose.yml and scripts if needed
-docker pull ghcr.io/tortoisewolfe/buddypress-allyship:latest
-docker-compose down wordpress-prod wp-prod-setup
-docker-compose up -d wordpress-prod wp-prod-setup
+
+# Update the image version in docker-compose.yml:
+# image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+
+docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+docker-compose down    # Stop all services
+docker-compose up -d   # Start all services with the updated image
 ```
 
 ```bash
