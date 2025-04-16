@@ -1,0 +1,6 @@
+## Tue Apr 15 22:35:40 EDT 2025: Testing authentication sequence
+## Sourced secrets
+## Attempted Docker login
+## Attempted image pull
+Error response from daemon: denied
+Pull failed - GitHub token may not have read:packages permission for this repository

@@ -1,5 +1,28 @@
 # WordPress Development Environment Guidelines
 
+## ⚠️ CRITICAL REQUIREMENT: ALWAYS USE SUDO WITH DOCKER COMMANDS ⚠️
+All Docker and Docker Compose commands MUST be run with sudo. Use sudo -E when environment variables need to be preserved (especially during deployment). Failure to use sudo will result in permission errors and deployment failures.
+
+## ⚠️ GITHUB AUTHENTICATION ERROR RESOLUTION ⚠️
+If you encounter "Error response from daemon: Head: unauthorized" or "Error response from daemon: denied" when pulling Docker images:
+
+1. **Verify Service Account Permissions**: Ensure your GCP service account has Secret Manager Secret Accessor role
+2. **Check GitHub PAT Permissions**: Your GitHub token MUST have `read:packages` scope for the specific repository
+3. **Generate New Token if Needed**:
+   ```bash
+   # 1. Create new token at https://github.com/settings/tokens with read:packages permission
+   # 2. Save new token in Google Secret Manager
+   gcloud secrets versions add GITHUB_TOKEN --data-file=<(echo -n "your_new_token")
+   # 3. Follow complete authentication sequence below
+   ```
+4. **Complete Authentication Sequence**:
+   ```bash
+   # ALWAYS run these steps in sequence:
+   source ./setup-secrets.sh
+   echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+   sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+   ```
+
 ## Production Image with Security Hardening
 - Security-hardened production image with Apache security configurations
 - Nginx reverse proxy with SSL termination for HTTPS support
@@ -18,31 +41,207 @@
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
 
+## Google Secret Manager Configuration
+The following secrets are stored in Google Secret Manager and should NOT be duplicated in .env:
+- GITHUB_TOKEN - GitHub personal access token
+- MYSQL_PASSWORD - Database user password
+- MYSQL_ROOT_PASSWORD - Database root password
+- WP_ADMIN_EMAIL - WordPress admin email
+- WP_ADMIN_PASSWORD - WordPress admin password
+
+To use these secrets with Docker Compose, run the setup-secrets.sh script:
+```bash
+# Load secrets from Google Secret Manager into environment variables
+source ./setup-secrets.sh
+
+# Run Docker Compose with the exported environment variables
+sudo -E docker-compose up -d
+```
+
+⚠️ **CRITICAL: ALWAYS run setup-secrets.sh before starting containers (especially wordpress-prod)!** ⚠️
+If you see "The MYSQL_PASSWORD variable is not set" errors, you forgot this step!
+
+### Testing Production Image
+For testing the production image with scripthammer.com domain, ALWAYS use this full sequence:
+```bash
+# 1. Load secrets first
+source ./setup-secrets.sh
+
+# 2. Log in to GitHub Container Registry (CRITICAL STEP - NEVER SKIP)
+echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+
+# 3. Start all required production containers
+sudo -E docker-compose up -d wordpress-prod wp-prod-setup db nginx
+```
+
+## Local .env Configuration
+The local .env file should ONLY contain non-sensitive values not stored in Google Secret Manager:
+- MYSQL_DATABASE=wordpress
+- WORDPRESS_DB_HOST=db:3306
+- WORDPRESS_DB_NAME=wordpress
+- MYSQL_USER=wordpress
+- WORDPRESS_DB_USER=wordpress
+- WP_SITE_URL=https://scripthammer.com
+- WP_SITE_TITLE="Allyship Learning Portal"
+- WP_ADMIN_USER=admin
+- DOMAIN_NAME=scripthammer.com
+- CERTBOT_EMAIL=admin@example.com
+
 ## Build & Run Commands
-- `docker-compose up -d`: Start WordPress environment
-- `docker-compose down`: Stop WordPress environment
-- `docker-compose build`: Rebuild Docker images (REQUIRED after script changes)
-- `docker-compose down && docker-compose build && docker-compose up -d`: Full rebuild workflow
-- `docker-compose exec wordpress wp --allow-root [command]`: Run WP-CLI commands
-- `docker-compose exec wordpress bash`: Access WordPress container shell
-- `docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh`: Populate site with demo content
+
+### Before Running ANY Command:
+- **ALWAYS** run `source ./setup-secrets.sh` BEFORE docker-compose commands
+- **ALWAYS** run GitHub Container Registry login `echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN` BEFORE image pulls
+- Skipping either step will result in authentication errors or empty passwords
+
+### Common Commands:
+- `source ./setup-secrets.sh && echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN && sudo -E docker-compose up -d`: Start WordPress environment (CORRECT full sequence)
+- `sudo docker-compose down`: Stop WordPress environment
+- `sudo docker-compose build`: Rebuild Docker images (REQUIRED after script changes)
+- `source ./setup-secrets.sh && echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN && sudo docker-compose down && sudo docker-compose build && sudo -E docker-compose up -d`: Full rebuild workflow
+- `sudo docker-compose exec wordpress wp --allow-root [command]`: Run WP-CLI commands
+- `sudo docker-compose exec wordpress bash`: Access WordPress container shell
+- `sudo docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh`: Populate site with demo content
+
+**CRITICAL: ALWAYS use sudo with Docker commands. Use sudo -E when environment variables need to be preserved. ALWAYS login to GitHub Container Registry AFTER sourcing secrets but BEFORE pulling images.**
 
 ## Running Hardened Production Image with Nginx
 - Version tagged, security-hardened production images are available in the GitHub Container Registry
 - Production environment includes nginx reverse proxy with SSL termination
-- Example configuration:
-  ```bash
-  # Build and tag a versioned production image
-  docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
-  
-  # Push to GitHub Container Registry (requires authentication with write:packages permission)
-  # Set GITHUB_TOKEN in .env file first
-  echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-  docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
-  
-  # Run the full production stack with nginx
-  docker-compose up -d wordpress-prod wp-prod-setup db nginx
-  ```
+
+### DevOps Workflow From Development to Production
+
+1. **Authenticate with Google Secret Manager** to access GitHub token:
+   ```bash
+   # Log into Google Cloud
+   gcloud auth login
+   
+   # Set your project ID
+   gcloud config set project YOUR_PROJECT_ID
+   
+   # List available secrets
+   gcloud secrets list
+   
+   # Get the GitHub token
+   GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
+   ```
+
+2. **Authenticate with GitHub Container Registry**:
+   ```bash
+   # Log into GitHub Container Registry using the token
+   echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+   ```
+
+3. **Pull the hardened production image**:
+   ```bash
+   docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+   ```
+
+4. **Create and configure environment with secrets from Google Secret Manager**:
+   ```bash
+   # Create directory structure if needed
+   mkdir -p /var/www/wp-dev
+   
+   # Create .env file populated with secrets from Google Secret Manager
+   cat > /var/www/wp-dev/.env << EOF
+   # MySQL credentials
+   MYSQL_ROOT_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD")
+   MYSQL_DATABASE=wordpress
+   MYSQL_USER=wordpress
+   MYSQL_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_PASSWORD")
+   
+   # WordPress database connection
+   WORDPRESS_DB_HOST=db:3306
+   WORDPRESS_DB_USER=wordpress
+   WORDPRESS_DB_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_PASSWORD")
+   WORDPRESS_DB_NAME=wordpress
+   
+   # WordPress installation settings
+   WP_SITE_URL=https://your-domain.com
+   WP_SITE_TITLE="Your WordPress Site"
+   WP_ADMIN_USER=admin
+   WP_ADMIN_PASSWORD=$(gcloud secrets versions access latest --secret="WP_ADMIN_PASSWORD")
+   WP_ADMIN_EMAIL=$(gcloud secrets versions access latest --secret="WP_ADMIN_EMAIL")
+   
+   # GitHub Container Registry access
+   GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
+   EOF
+   
+   # Secure the .env file
+   chmod 600 /var/www/wp-dev/.env
+   ```
+
+5. **Deploy the production stack**:
+   ```bash
+   cd /var/www/wp-dev
+   docker-compose up -d
+   ```
+
+6. **Verify deployment**:
+   ```bash
+   # Check running containers
+   docker-compose ps
+   
+   # Check logs
+   docker-compose logs -f
+   ```
+
+### Complete DevOps Workflow (From Development to Production)
+
+#### Local Development:
+```bash
+# Start development environment
+sudo -E docker-compose up -d wordpress wp-setup db
+```
+
+#### Build Production Image:
+```bash
+# Build and tag a versioned production image
+sudo docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
+
+# Get GitHub token from Google Secret Manager
+GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
+
+# Push to GitHub Container Registry
+echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe --password-stdin
+sudo -E docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+```
+
+#### Test Production Image Locally:
+```bash
+# IMPORTANT: You MUST run setup-secrets.sh before starting production containers!
+source ./setup-secrets.sh
+
+# Run the full production stack with nginx locally
+sudo -E docker-compose up -d wordpress-prod wp-prod-setup db nginx
+```
+
+#### Deploy to Production Server:
+```bash
+# On production server:
+
+# 1. Clone repository (first time only)
+git clone https://github.com/TortoiseWolfe/wp-dev.git /var/www/wp-dev
+cd /var/www/wp-dev
+
+# 2. Pull latest code (for updates)
+git pull origin main
+
+# 3. Set up environment with secrets 
+# (see step 4 in "DevOps Workflow From Development to Production" above)
+
+# 4. Pull latest image using GitHub token from Google Secret Manager
+GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
+echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe --password-stdin
+sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+
+# 5. Deploy with docker-compose
+sudo -E docker-compose up -d
+
+# CRITICAL: ALWAYS use sudo with ALL Docker commands
+# Use sudo -E when environment variables need to be preserved
+```
+
 - Access the production environment through nginx at http://localhost:80 for HTTP or https://localhost:443 for HTTPS
 - For production, configure proper domain names and valid SSL certificates
 
@@ -52,9 +251,9 @@
   1. Make changes to scripts
   2. Run `docker-compose down -v` to stop containers and remove volumes
   3. Run `docker image prune -a` to delete all unused images
-  4. Run `docker-compose build` to rebuild the image with your changes
-  5. Run `docker-compose up -d` to start containers with updated image
-  6. Complete one-line command: `docker-compose down -v && docker image prune -a -f && docker-compose build && docker-compose up -d`
+  4. Run `sudo docker-compose build` to rebuild the image with your changes
+  5. Run `sudo -E docker-compose up -d` to start containers with updated image
+  6. Complete one-line command: `sudo docker-compose down -v && sudo docker image prune -a -f && sudo docker-compose build && sudo -E docker-compose up -d`
 - Skipping image deletion will cause your changes to be lost or inconsistent
 - NEVER use the 'latest' tag for production images
 
@@ -97,6 +296,8 @@
 - [ ] Add comprehensive security scanning in CI/CD pipeline
 
 ### DevOps & CI/CD
+- [x] Document Google Secret Manager workflow for accessing GitHub tokens
+- [x] Document workflow from development to production deployment
 - [ ] Document required GitHub secrets for GitHub Actions workflow
 - [ ] Add basic tests to run before deployment
 - [ ] Enhance health checks for production containers
@@ -116,6 +317,8 @@
 - [ ] Optimize Docker image size
 
 ### Documentation
+- [x] Document automated environment setup using Google Secret Manager
+- [x] Document complete DevOps workflow from development to production
 - [ ] Add environment variable validation in scripts
 - [ ] Document routine maintenance tasks
 - [ ] Add WordPress core and plugin update strategy

@@ -168,24 +168,37 @@ docker-compose up -d
 
 ### GitHub Token for Pulling Images
 
-Create a GitHub Personal Access Token for accessing the Container Registry:
+The GitHub token is stored in Google Secret Manager and accessed via the setup-secrets.sh script. If you need to update the token:
 
 1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
 2. Generate a new token named "Container Registry Access" (90 day expiration)
 3. Repository access: "Only select repositories" → select wp-dev repository
-4. Permissions: Set "Packages" to "Read"
+4. Permissions: Set "Packages" to "Read" (this permission is CRITICAL)
 5. **IMPORTANT**: Copy the token immediately after generation
-
-Add the token to your production server:
+6. Update in Google Secret Manager:
 
 ```bash
-# Add to .env file (recommended)
-nano /var/www/wp-dev/.env
-GITHUB_TOKEN=ghp_your_personal_access_token_here
-
-# Secure the file
-chmod 600 /var/www/wp-dev/.env
+# Update token in Google Secret Manager
+echo -n "your_new_token" | gcloud secrets versions add GITHUB_TOKEN --data-file=-
 ```
+
+### Docker Image Authentication Workflow
+
+To properly authenticate and pull images, ALWAYS follow this exact sequence:
+
+```bash
+# 1. Source secrets script to get token from Google Secret Manager
+source ./setup-secrets.sh
+
+# 2. Login to GitHub Container Registry with the token
+# CRITICAL: This step must be run EVERY TIME before pulling images
+echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+
+# 3. Now you can pull images
+sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+```
+
+⚠️ **IMPORTANT**: Skipping any of these steps will result in authentication errors!
 
 ### Production Server Deployment
 
@@ -399,7 +412,19 @@ The script automatically:
 
 For the script to access secrets from Google Secret Manager:
 
-1. **Create the necessary secrets in Google Secret Manager**:
+1. **Set up Google Cloud SDK and authenticate**:
+```bash
+# Install Google Cloud SDK if not already installed
+# Visit: https://cloud.google.com/sdk/docs/install for instructions
+
+# Authenticate with Google Cloud
+gcloud auth login
+
+# Set your project
+gcloud config set project YOUR_PROJECT_ID
+```
+
+2. **Create the necessary secrets in Google Secret Manager**:
 ```bash
 # Create secrets (run these commands from a machine with gcloud installed)
 gcloud secrets create MYSQL_ROOT_PASSWORD --replication-policy="automatic"
@@ -414,6 +439,22 @@ echo -n "your-secure-db-password" | gcloud secrets versions add MYSQL_PASSWORD -
 echo -n "your-secure-admin-password" | gcloud secrets versions add WP_ADMIN_PASSWORD --data-file=-
 echo -n "admin@yourdomain.com" | gcloud secrets versions add WP_ADMIN_EMAIL --data-file=-
 echo -n "ghp_your_github_token" | gcloud secrets versions add GITHUB_TOKEN --data-file=-
+```
+
+3. **Access secrets from Google Secret Manager**:
+```bash
+# List available secrets
+gcloud secrets list
+
+# Access a specific secret
+gcloud secrets versions access latest --secret="GITHUB_TOKEN"
+
+# Use the GitHub token to authenticate with GitHub
+GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
+echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+
+# Clone the repository using the token
+git clone https://github.com/TortoiseWolfe/wp-dev.git
 ```
 
 2. **Grant VM access to Secret Manager**:
