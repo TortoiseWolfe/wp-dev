@@ -145,10 +145,11 @@ retry_apt_operation "apt-get -y install apt-transport-https ca-certificates curl
 ### SWAP CONFIGURATION ###
 ##########################
 
-# Create swap file
-SWAP_SIZE=4
+# Create and optimize swap file
+SWAP_SIZE=8  # Increased to 8GB for better performance
 echo "Creating ${SWAP_SIZE}GB swap file" >> $LOG_FILE
 if [ ! -f /swapfile ]; then
+    echo "Creating new swap file..." >> $LOG_FILE
     fallocate -l ${SWAP_SIZE}G /swapfile >> $LOG_FILE 2>&1 || {
         echo "ERROR: fallocate failed with exit code $?" >> $LOG_FILE
         echo "Trying dd method instead" >> $LOG_FILE
@@ -168,14 +169,40 @@ if [ ! -f /swapfile ]; then
     
     echo "Adding swap to fstab" >> $LOG_FILE
     echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    echo "vm.swappiness=10" >> /etc/sysctl.conf
-    echo "vm.vfs_cache_pressure=50" >> /etc/sysctl.conf
-    sysctl -p >> $LOG_FILE 2>&1 || echo "ERROR: sysctl failed with $?" >> $LOG_FILE
-    
-    echo "Swap status:" >> $LOG_FILE
-    swapon --show >> $LOG_FILE 2>&1
-    free -h >> $LOG_FILE 2>&1
+else
+    echo "Swap file already exists, checking if resizing is needed..." >> $LOG_FILE
+    CURRENT_SWAP_SIZE=$(du -h /swapfile | awk '{print $1}' | tr -d 'G')
+    if (( $(echo "$CURRENT_SWAP_SIZE < $SWAP_SIZE" | bc -l) )); then
+        echo "Resizing swap file from ${CURRENT_SWAP_SIZE}GB to ${SWAP_SIZE}GB" >> $LOG_FILE
+        swapoff /swapfile
+        rm /swapfile
+        fallocate -l ${SWAP_SIZE}G /swapfile || dd if=/dev/zero of=/swapfile bs=1G count=${SWAP_SIZE}
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+    else
+        echo "Current swap size is adequate, no resize needed" >> $LOG_FILE
+    fi
 fi
+
+# Optimize swap settings for better performance
+echo "Optimizing swap settings for memory-intensive operations" >> $LOG_FILE
+# Lower swappiness for server workloads
+echo "vm.swappiness=5" > /etc/sysctl.d/99-swap-settings.conf
+# Reduce cache pressure
+echo "vm.vfs_cache_pressure=50" >> /etc/sysctl.d/99-swap-settings.conf
+# Add additional memory management settings
+echo "vm.dirty_background_ratio=5" >> /etc/sysctl.d/99-swap-settings.conf
+echo "vm.dirty_ratio=10" >> /etc/sysctl.d/99-swap-settings.conf
+# Increase max map count for high memory operations
+echo "vm.max_map_count=262144" >> /etc/sysctl.d/99-swap-settings.conf
+
+# Apply settings
+sysctl -p /etc/sysctl.d/99-swap-settings.conf >> $LOG_FILE 2>&1 || echo "ERROR: sysctl failed with $?" >> $LOG_FILE
+
+echo "Swap status:" >> $LOG_FILE
+swapon --show >> $LOG_FILE 2>&1
+free -h >> $LOG_FILE 2>&1
 #endregion
 
 #region DOCKER INSTALLATION

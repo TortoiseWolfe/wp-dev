@@ -19,7 +19,9 @@ docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
 # Push to GitHub Container Registry (requires proper token setup)
 # 1. Create a GitHub PAT with write:packages and read:packages permissions
 # 2. Save token in .env file: GITHUB_TOKEN=your_token_here
-# 3. Login with: echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+# 3. Login with: 
+# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
+echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
 # 4. Push: docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
 
 # Run the complete hardened production stack
@@ -192,7 +194,9 @@ source ./setup-secrets.sh
 
 # 2. Login to GitHub Container Registry with the token
 # CRITICAL: This step must be run EVERY TIME before pulling images
-echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
+# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
+echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
 
 # 3. Now you can pull images
 sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
@@ -216,6 +220,7 @@ git fetch origin && git checkout main && git pull origin main
 cp .env.example .env && nano .env  # Edit with production values
 
 # Deploy the complete hardened production stack
+# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
 docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
 docker-compose up -d
@@ -280,6 +285,7 @@ if [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 log "Authenticating with GitHub Container Registry..."
+# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u tortoisewolfe --password-stdin
 
 # Step 4: Pull the latest production image from GHCR
@@ -569,6 +575,49 @@ sudo usermod -aG docker $USER && newgrp docker
 ```
 - **GitHub Registry access denied**: Authenticate with token from [GitHub Token section](#github-token-for-pulling-images)
 - **Docker installation issues**: Check logs at `/tmp/enhanced-boot.log`
+
+## SSL Configuration
+
+To set up SSL with Let's Encrypt for your WordPress site:
+
+1. **Prerequisites:**
+   - A domain name pointing to your server's IP address (DNS A record)
+   - Port 80 and 443 open on your firewall
+
+2. **Configuration Steps:**
+   - Update your `.env` file with:
+     ```
+     WP_SITE_URL=https://yourdomain.com
+     DOMAIN_NAME=yourdomain.com
+     CERTBOT_EMAIL=your.email@example.com
+     ```
+
+3. **Certificate Generation:**
+   ```bash
+   # Run the SSL setup script
+   sudo ./ssl-setup.sh
+   ```
+
+   The script automatically:
+   - Configures Nginx with HTTPS support
+   - Creates temporary self-signed certificates
+   - Obtains official Let's Encrypt certificates
+   - Sets up automatic certificate renewal (every 12 hours)
+
+4. **Verify SSL Configuration:**
+   ```bash
+   # Check if certificates were generated
+   sudo -E docker-compose exec certbot certbot certificates
+
+   # Test HTTPS connection
+   curl -I https://yourdomain.com
+   ```
+
+5. **Troubleshooting:**
+   - If certificate generation fails, check:
+     - That your domain resolves to your server (dig yourdomain.com)
+     - That ports 80/443 are accessible from the internet
+     - Certbot logs: `sudo -E docker-compose logs certbot`
 
 ## Additional Resources
 

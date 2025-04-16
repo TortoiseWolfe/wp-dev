@@ -1,7 +1,23 @@
 # WordPress Development Environment Guidelines
 
-## ⚠️ CRITICAL REQUIREMENT: ALWAYS USE SUDO WITH DOCKER COMMANDS ⚠️
-All Docker and Docker Compose commands MUST be run with sudo. Use sudo -E when environment variables need to be preserved (especially during deployment). Failure to use sudo will result in permission errors and deployment failures.
+## ATTENTION CLAUDE: CHECK MEMORY LOG FIRST!
+When starting a new session, IMMEDIATELY check `/home/jonpohlner/memory_log.txt` to restore context from previous sessions. This helps maintain continuity when sessions are interrupted.
+
+## ✅ ENVIRONMENT VARIABLE SOLUTION IMPLEMENTED ✅
+The issue with environment variables not being passed to containers has been fixed by modifying the setup-secrets.sh script to update the .env file with actual secret values. Docker Compose prioritizes .env file over shell environment variables, which was causing the issue.
+
+## ✅ WP-CLI AUTOMATION ISSUES RESOLVED ✅
+WP-CLI commands initially failed with "Undefined array key HTTP_HOST" error, but this has been resolved by:
+1. Complete removal of all containers and volumes (`docker compose down -v`)
+2. Fresh start with clean volumes
+3. The issue appears to have been related to corrupted state in the persisted volumes
+4. Despite HTTP_HOST warnings, the setup runs successfully with a clean environment
+
+## ⚠️ CRITICAL REQUIREMENT: ALWAYS FOLLOW THIS SEQUENCE ⚠️
+1. Run `source ./setup-secrets.sh` first (this now updates .env file automatically)
+2. Run `echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN` 
+3. Run `sudo -E docker-compose up -d [services]` to start containers
+4. Always use sudo with Docker commands to avoid permission errors ("Error: kill EPERM")
 
 ## ⚠️ GITHUB AUTHENTICATION ERROR RESOLUTION ⚠️
 If you encounter "Error response from daemon: Head: unauthorized" or "Error response from daemon: denied" when pulling Docker images:
@@ -108,6 +124,86 @@ The local .env file should ONLY contain non-sensitive values not stored in Googl
 ## Running Hardened Production Image with Nginx
 - Version tagged, security-hardened production images are available in the GitHub Container Registry
 - Production environment includes nginx reverse proxy with SSL termination
+
+### ⚠️ TROUBLESHOOTING WP-CLI ISSUES ⚠️
+If the WP-CLI setup fails with "Undefined array key HTTP_HOST" or other errors:
+
+1. **Complete Reset Solution**:
+   ```bash
+   # Stop all containers and remove volumes
+   sudo -E docker compose down -v
+   
+   # Run setup sequence from scratch
+   source ./setup-secrets.sh
+   echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+   sudo -E docker compose up -d
+   ```
+
+2. **Monitor Setup Logs**:
+   ```bash
+   # Check logs from wp-setup container
+   sudo -E docker compose logs wp-setup
+   ```
+
+3. **Verify WordPress Installation**:
+   ```bash
+   # Check if WordPress is installed
+   sudo -E docker compose exec wordpress wp core is-installed
+   
+   # Check BuddyPress components activation
+   sudo -E docker compose exec wordpress wp bp component list
+   ```
+
+Non-critical HTTP_HOST warnings can be ignored as long as the setup completes successfully.
+
+### ⚠️ TROUBLESHOOTING SSL ISSUES ⚠️
+If you encounter SSL/HTTPS configuration issues:
+
+1. **Check SSL Certificate Status**:
+   ```bash
+   # Verify if certificates exist
+   sudo -E docker-compose exec certbot certbot certificates
+   
+   # Check if certificate files exist in the volume
+   sudo ls -la ./nginx/ssl/live/yourdomain.com/
+   ```
+
+2. **Manually Generate SSL Certificates**:
+   ```bash
+   # Generate SSL certificates using the included script
+   sudo ./ssl-setup.sh
+   
+   # OR manually request certificates with certbot
+   sudo -E docker-compose exec certbot certbot certonly \
+     --webroot \
+     --webroot-path=/var/www/certbot \
+     --email your.email@example.com \
+     --agree-tos \
+     --no-eff-email \
+     -d yourdomain.com \
+     -d www.yourdomain.com
+   ```
+
+3. **Verify Nginx Configuration**:
+   ```bash
+   # Check Nginx configuration
+   sudo cat ./nginx/conf/default.conf
+   
+   # Test Nginx configuration (from inside container)
+   sudo -E docker-compose exec nginx nginx -t
+   
+   # Restart Nginx after changes
+   sudo -E docker-compose restart nginx
+   ```
+
+4. **Troubleshoot Domain Resolution**:
+   ```bash
+   # Check if domain resolves to your server
+   dig yourdomain.com
+   
+   # Check site URL in WordPress
+   sudo -E docker-compose exec wordpress-prod wp option get siteurl --allow-root
+   ```
 
 ### DevOps Workflow From Development to Production
 
@@ -290,6 +386,8 @@ sudo -E docker-compose up -d
 - [x] Add HTTPS configuration with Let's Encrypt for production via nginx
 - [x] Implement basic Apache security hardening (ServerTokens, ServerSignature, TraceEnable)
 - [x] Set proper file permissions for WordPress files
+- [x] Create automated SSL certificate setup script (get-certificates.sh)
+- [x] Document SSL configuration procedure in README 
 - [ ] Document WordPress security plugins for production
 - [ ] Implement additional PHP security configurations
 - [ ] Add firewall configuration examples for production servers

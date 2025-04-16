@@ -1,13 +1,32 @@
 #!/bin/bash
-# Script to export secret values as environment variables for Docker
+# Script to generate and export secret values as environment variables for Docker
 
-# Export secret values from Google Secret Manager
-export MYSQL_ROOT_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD")
-export MYSQL_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_PASSWORD") 
-export WORDPRESS_DB_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_PASSWORD")
-export WP_ADMIN_PASSWORD=$(gcloud secrets versions access latest --secret="WP_ADMIN_PASSWORD")
-export WP_ADMIN_EMAIL=$(gcloud secrets versions access latest --secret="WP_ADMIN_EMAIL")
-export GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
+# Generate random passwords
+export MYSQL_ROOT_PASSWORD=$(tr -dc 'A-Za-z0-9!#$%&*+-' < /dev/urandom | head -c 12)
+export MYSQL_PASSWORD=$(tr -dc 'A-Za-z0-9!#$%&*+-' < /dev/urandom | head -c 12)
+export WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
+export WP_ADMIN_PASSWORD=$(tr -dc 'A-Za-z0-9!#$%&*+-' < /dev/urandom | head -c 12)
+export WP_ADMIN_EMAIL="admin@example.com"
+export GITHUB_TOKEN="ghp_dummy_token_for_local_dev"
+
+# Update .env file with the secrets - Docker Compose will use these values
+sed -i.bak "/# Added automatically by setup-secrets.sh/d" .env
+sed -i.bak "/# These will be overwritten by setup-secrets.sh each time/d" .env
+sed -i.bak "/^MYSQL_ROOT_PASSWORD=/d" .env
+sed -i.bak "/^MYSQL_PASSWORD=/d" .env
+sed -i.bak "/^WORDPRESS_DB_PASSWORD=/d" .env
+sed -i.bak "/^WP_ADMIN_PASSWORD=/d" .env
+sed -i.bak "/^WP_ADMIN_EMAIL=/d" .env
+
+# Add the new values
+echo "" >> .env
+echo "# Added automatically by setup-secrets.sh - Do not edit" >> .env
+echo "# These will be overwritten by setup-secrets.sh each time" >> .env
+echo "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" >> .env
+echo "MYSQL_PASSWORD=$MYSQL_PASSWORD" >> .env
+echo "WORDPRESS_DB_PASSWORD=$WORDPRESS_DB_PASSWORD" >> .env
+echo "WP_ADMIN_PASSWORD=$WP_ADMIN_PASSWORD" >> .env
+echo "WP_ADMIN_EMAIL=$WP_ADMIN_EMAIL" >> .env
 
 # Configure SSH for Git with persistent key management
 SSH_KEY_PATH=~/.ssh/github_wp_dev

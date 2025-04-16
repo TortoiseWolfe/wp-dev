@@ -6,10 +6,13 @@ handle_error() {
     exit 1
 }
 
+# Log setup start with timestamp
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting WordPress setup with WP_SITE_URL=${WP_SITE_URL}"
+
 echo "Waiting for database connection..."
 ATTEMPTS=0
 MAX_ATTEMPTS=30
-until wp db check --path=/var/www/html || [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; do
+until wp db check --path=/var/www/html --url="${WP_SITE_URL}" || [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; do
   sleep 5
   ATTEMPTS=$((ATTEMPTS+1))
   echo "Waiting for database... Attempt $ATTEMPTS of $MAX_ATTEMPTS"
