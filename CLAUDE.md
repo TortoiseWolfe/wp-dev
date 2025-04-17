@@ -6,12 +6,12 @@ When starting a new session, IMMEDIATELY check `/home/jonpohlner/memory_log.txt`
 ## ✅ ENVIRONMENT VARIABLE SOLUTION IMPLEMENTED ✅
 The issue with environment variables not being passed to containers has been fixed by modifying the setup-secrets.sh script to update the .env file with actual secret values. Docker Compose prioritizes .env file over shell environment variables, which was causing the issue.
 
-## ✅ WP-CLI AUTOMATION ISSUES RESOLVED ✅
-WP-CLI commands initially failed with "Undefined array key HTTP_HOST" error, but this has been resolved by:
-1. Complete removal of all containers and volumes (`docker compose down -v`)
-2. Fresh start with clean volumes
-3. The issue appears to have been related to corrupted state in the persisted volumes
-4. Despite HTTP_HOST warnings, the setup runs successfully with a clean environment
+## ✅ WP-CLI AUTOMATION OPTIMIZED ✅
+WP-CLI auto-installation now uses a streamlined approach:
+1. Direct WordPress install commands in docker-compose.yml
+2. Using the versioned v0.1.0 image from GitHub Container Registry
+3. Consistent setup with proper MySQL database configuration
+4. Setup completes automatically with proper environment variables
 
 ## ⚠️ CRITICAL REQUIREMENT: ALWAYS FOLLOW THIS SEQUENCE ⚠️
 1. Run `source ./setup-secrets.sh` first (this now updates .env file automatically)
@@ -125,36 +125,28 @@ The local .env file should ONLY contain non-sensitive values not stored in Googl
 - Version tagged, security-hardened production images are available in the GitHub Container Registry
 - Production environment includes nginx reverse proxy with SSL termination
 
-### ⚠️ TROUBLESHOOTING WP-CLI ISSUES ⚠️
-If the WP-CLI setup fails with "Undefined array key HTTP_HOST" or other errors:
+### ✅ STREAMLINED WORDPRESS SETUP ✅
+The setup process has been optimized by directly executing WordPress installation commands in docker-compose.yml:
 
-1. **Complete Reset Solution**:
+1. **Production Environment Setup**:
    ```bash
-   # Stop all containers and remove volumes
-   sudo -E docker compose down -v
-   
-   # Run setup sequence from scratch
+   # ALWAYS USE THIS SEQUENCE (in order):
    source ./setup-secrets.sh
    sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
+   sudo -E docker compose down -v
    sudo -E docker compose up -d
    ```
 
-2. **Monitor Setup Logs**:
-   ```bash
-   # Check logs from wp-setup container
-   sudo -E docker compose logs wp-setup
-   ```
-
-3. **Verify WordPress Installation**:
+2. **Verify Installation Success**:
    ```bash
    # Check if WordPress is installed
-   sudo -E docker compose exec wordpress wp core is-installed
+   sudo -E docker compose exec wordpress-prod wp core is-installed --allow-root
    
-   # Check BuddyPress components activation
-   sudo -E docker compose exec wordpress wp bp component list
+   # Verify BuddyPress plugin
+   sudo -E docker compose exec wordpress-prod wp plugin list --allow-root
    ```
 
-Non-critical HTTP_HOST warnings can be ignored as long as the setup completes successfully.
+The system now uses the v0.1.0 versioned image from the container registry with core installation automated in the docker-compose configuration. No manual troubleshooting of WP-CLI should be needed.
 
 ### ⚠️ TROUBLESHOOTING SSL ISSUES ⚠️
 If you encounter SSL/HTTPS configuration issues:

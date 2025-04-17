@@ -73,7 +73,7 @@ services:
     build:
       context: .
       target: production
-    image: ghcr.io/tortoisewolfe/wp-dev:main
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
     depends_on:
       - db
     expose:
@@ -101,7 +101,7 @@ services:
       - wordpress_network
     
   wp-prod-setup:
-    image: ghcr.io/tortoisewolfe/wp-dev:main
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
     depends_on:
       - wordpress-prod
     environment:
@@ -118,7 +118,8 @@ services:
     volumes:
       - wp_prod_data:/var/www/html
     command: >
-      bash -c "sleep 30 &&
+      bash -c "sleep 45 &&
+              wp core install --url=${WP_SITE_URL} --title=\"${WP_SITE_TITLE}\" --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${WP_ADMIN_EMAIL} --path=/var/www/html --skip-email --allow-root &&
               wp option update siteurl ${WP_SITE_URL} --allow-root &&
               wp option update home ${WP_SITE_URL} --allow-root &&
               /usr/local/bin/setup.sh"
