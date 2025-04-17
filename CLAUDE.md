@@ -1,7 +1,7 @@
 # WordPress Development Environment Guidelines
 
-## ATTENTION CLAUDE: CHECK MEMORY LOG FIRST!
-When starting a new session, IMMEDIATELY check `/home/jonpohlner/memory_log.txt` to restore context from previous sessions. This helps maintain continuity when sessions are interrupted.
+## ⚠️ ATTENTION CLAUDE: CHECK MEMORY LOG FIRST! ⚠️
+When starting a new session, IMMEDIATELY check `/home/jonpohlner/memory_log.txt` first to restore context. DO NOT GIVE UP due to system load - the system can handle it despite high load and limited RAM. Follow the critical sequence in memory_log.txt completely.
 
 ## ✅ ENVIRONMENT VARIABLE SOLUTION IMPLEMENTED ✅
 The issue with environment variables not being passed to containers has been fixed by modifying the setup-secrets.sh script to update the .env file with actual secret values. Docker Compose prioritizes .env file over shell environment variables, which was causing the issue.
@@ -15,7 +15,7 @@ WP-CLI commands initially failed with "Undefined array key HTTP_HOST" error, but
 
 ## ⚠️ CRITICAL REQUIREMENT: ALWAYS FOLLOW THIS SEQUENCE ⚠️
 1. Run `source ./setup-secrets.sh` first (this now updates .env file automatically)
-2. Run `echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN` 
+2. Run `sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"` 
 3. Run `sudo -E docker-compose up -d [services]` to start containers
 4. Always use sudo with Docker commands to avoid permission errors ("Error: kill EPERM")
 
@@ -35,7 +35,7 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
    ```bash
    # ALWAYS run these steps in sequence:
    source ./setup-secrets.sh
-   echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+   sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
    sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
    ```
 
@@ -84,7 +84,7 @@ For testing the production image with scripthammer.com domain, ALWAYS use this f
 source ./setup-secrets.sh
 
 # 2. Log in to GitHub Container Registry (CRITICAL STEP - NEVER SKIP)
-echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
 
 # 3. Start all required production containers
 sudo -E docker-compose up -d wordpress-prod wp-prod-setup db nginx
@@ -107,14 +107,14 @@ The local .env file should ONLY contain non-sensitive values not stored in Googl
 
 ### Before Running ANY Command:
 - **ALWAYS** run `source ./setup-secrets.sh` BEFORE docker-compose commands
-- **ALWAYS** run GitHub Container Registry login `echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN` BEFORE image pulls
+- **ALWAYS** run GitHub Container Registry login `sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"` BEFORE image pulls
 - Skipping either step will result in authentication errors or empty passwords
 
 ### Common Commands:
-- `source ./setup-secrets.sh && echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN && sudo -E docker-compose up -d`: Start WordPress environment (CORRECT full sequence)
+- `source ./setup-secrets.sh && sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN" && sudo -E docker-compose up -d`: Start WordPress environment (CORRECT full sequence)
 - `sudo docker-compose down`: Stop WordPress environment
 - `sudo docker-compose build`: Rebuild Docker images (REQUIRED after script changes)
-- `source ./setup-secrets.sh && echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN && sudo docker-compose down && sudo docker-compose build && sudo -E docker-compose up -d`: Full rebuild workflow
+- `source ./setup-secrets.sh && sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN" && sudo docker-compose down && sudo docker-compose build && sudo -E docker-compose up -d`: Full rebuild workflow
 - `sudo docker-compose exec wordpress wp --allow-root [command]`: Run WP-CLI commands
 - `sudo docker-compose exec wordpress bash`: Access WordPress container shell
 - `sudo docker-compose exec wordpress /usr/local/bin/devscripts/demo-content.sh`: Populate site with demo content
@@ -135,7 +135,7 @@ If the WP-CLI setup fails with "Undefined array key HTTP_HOST" or other errors:
    
    # Run setup sequence from scratch
    source ./setup-secrets.sh
-   echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p $GITHUB_TOKEN
+   sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
    sudo -E docker compose up -d
    ```
 
@@ -225,7 +225,7 @@ If you encounter SSL/HTTPS configuration issues:
 2. **Authenticate with GitHub Container Registry**:
    ```bash
    # Log into GitHub Container Registry using the token
-   echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+   docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
    ```
 
 3. **Pull the hardened production image**:
@@ -299,7 +299,7 @@ sudo docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
 GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
 
 # Push to GitHub Container Registry
-echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe --password-stdin
+sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
 sudo -E docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
 ```
 
@@ -328,7 +328,7 @@ git pull origin main
 
 # 4. Pull latest image using GitHub token from Google Secret Manager
 GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
-echo $GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe --password-stdin
+sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
 sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
 
 # 5. Deploy with docker-compose

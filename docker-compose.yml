@@ -15,57 +15,58 @@ services:
     networks:
       - wordpress_network
 
-  # Development environment
-  wordpress:
-    build:
-      context: .
-      target: development
-    image: mywordpress:dev
-    depends_on:
-      - db
-    expose:
-      - "80"
-    environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-    volumes:
-      - wp_data:/var/www/html
-    restart: always
-    networks:
-      - wordpress_network
+  # Development environment (commented out for production)
+#  wordpress:
+#    build:
+#      context: .
+#      target: development
+#    image: mywordpress:dev
+#    depends_on:
+#      - db
+#    expose:
+#      - "80"
+#    environment:
+#      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+#      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+#      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+#      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+#    volumes:
+#      - wp_data:/var/www/html
+#    restart: always
+#    networks:
+#      - wordpress_network
 
-  wp-setup:
-    image: mywordpress:dev
-    depends_on:
-      - wordpress
-    environment:
-      WP_SITE_URL: ${WP_SITE_URL}
-      WP_SITE_TITLE: ${WP_SITE_TITLE}
-      WP_ADMIN_USER: ${WP_ADMIN_USER}
-      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
-      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT:-false}
-    volumes:
-      - wp_data:/var/www/html
-    # Run setup and conditionally run demo-content
-    command: >
-      bash -c "/usr/local/bin/setup.sh && 
-              if [ \"$${SKIP_DEMO_CONTENT}\" != \"true\" ]; then
-                echo 'Running demo content installation...' &&
-                sleep 10 && 
-                /usr/local/bin/devscripts/demo-content.sh;
-              else
-                echo 'Skipping demo content installation...';
-              fi"
-    restart: "no"
-    networks:
-      - wordpress_network
+  # Development setup (commented out for production)
+#  wp-setup:
+#    image: mywordpress:dev
+#    depends_on:
+#      - wordpress
+#    environment:
+#      WP_SITE_URL: ${WP_SITE_URL}
+#      WP_SITE_TITLE: ${WP_SITE_TITLE}
+#      WP_ADMIN_USER: ${WP_ADMIN_USER}
+#      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
+#      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
+#      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+#      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+#      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+#      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+#      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT:-false}
+#    volumes:
+#      - wp_data:/var/www/html
+#    # Run setup and conditionally run demo-content
+#    command: >
+#      bash -c "/usr/local/bin/setup.sh && 
+#              if [ \"$${SKIP_DEMO_CONTENT}\" != \"true\" ]; then
+#                echo 'Running demo content installation...' &&
+#                sleep 10 && 
+#                /usr/local/bin/devscripts/demo-content.sh;
+#              else
+#                echo 'Skipping demo content installation...';
+#              fi"
+#    restart: "no"
+#    networks:
+#      - wordpress_network
 
   # Production environment
   wordpress-prod:
@@ -105,16 +106,22 @@ services:
       - wordpress-prod
     environment:
       WP_SITE_URL: ${WP_SITE_URL}
+      WP_SITE_TITLE: ${WP_SITE_TITLE}
+      WP_ADMIN_USER: ${WP_ADMIN_USER}
+      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
+      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
       WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT:-true}
     volumes:
       - wp_prod_data:/var/www/html
     command: >
-      bash -c "sleep 15 &&
+      bash -c "sleep 30 &&
               wp option update siteurl ${WP_SITE_URL} --allow-root &&
-              wp option update home ${WP_SITE_URL} --allow-root"
+              wp option update home ${WP_SITE_URL} --allow-root &&
+              /usr/local/bin/setup.sh"
     restart: "no"
     networks:
       - wordpress_network
@@ -130,7 +137,6 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl
       - certbot_data:/var/www/certbot
     depends_on:
-      - wordpress
       - wordpress-prod
     restart: always
     networks:

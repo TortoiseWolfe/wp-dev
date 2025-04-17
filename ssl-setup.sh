@@ -167,8 +167,8 @@ EOF
 
 # Stop and restart containers
 log "Restarting containers to apply SSL configuration..."
-docker-compose down
-docker-compose up -d
+sudo -E docker-compose down
+sudo -E docker-compose up -d
 
 # Wait for Nginx to start
 log "Waiting for Nginx to start..."
@@ -179,9 +179,9 @@ ATTEMPT=0
 # Check if Nginx is running with retry
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   ATTEMPT=$((ATTEMPT+1))
-  nginx_container=$(docker-compose ps -q nginx)
+  nginx_container=$(sudo -E docker-compose ps -q nginx)
   if [ -n "$nginx_container" ]; then
-    nginx_status=$(docker inspect --format='{{.State.Status}}' $nginx_container)
+    nginx_status=$(sudo docker inspect --format='{{.State.Status}}' $nginx_container)
     if [ "$nginx_status" = "running" ]; then
       log "Nginx container is running (attempt $ATTEMPT/$MAX_ATTEMPTS)"
       break
@@ -195,7 +195,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
     log_error "Nginx container failed to start after $MAX_ATTEMPTS attempts"
     log "Dumping container logs:"
-    docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
+    sudo -E docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
     error_exit "Nginx container failed to start. Check the logs for details."
   fi
   
@@ -206,9 +206,9 @@ done
 ATTEMPT=0
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   ATTEMPT=$((ATTEMPT+1))
-  certbot_container=$(docker-compose ps -q certbot)
+  certbot_container=$(sudo -E docker-compose ps -q certbot)
   if [ -n "$certbot_container" ]; then
-    certbot_status=$(docker inspect --format='{{.State.Status}}' $certbot_container)
+    certbot_status=$(sudo docker inspect --format='{{.State.Status}}' $certbot_container)
     if [ "$certbot_status" = "running" ]; then
       log "Certbot container is running (attempt $ATTEMPT/$MAX_ATTEMPTS)"
       break
@@ -222,7 +222,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
     log_error "Certbot container failed to start after $MAX_ATTEMPTS attempts"
     log "Dumping container logs:"
-    docker-compose logs --tail=100 certbot >> $LOG_FILE 2>&1
+    sudo -E docker-compose logs --tail=100 certbot >> $LOG_FILE 2>&1
     error_exit "Certbot container failed to start. Check the logs for details."
   fi
   
@@ -255,7 +255,7 @@ fi
 # Request real Let's Encrypt certificate
 log "Requesting Let's Encrypt certificates for $DOMAIN_NAME..."
 log "This may take a minute or two..."
-docker-compose exec -T certbot certbot certonly \
+sudo -E docker-compose exec -T certbot certbot certonly \
   --webroot \
   --webroot-path=/var/www/certbot \
   --email "$ADMIN_EMAIL" \
@@ -293,21 +293,21 @@ fi
 
 # Restart Nginx to apply new certificates
 log "Restarting Nginx to apply Let's Encrypt certificates..."
-docker-compose restart nginx
+sudo -E docker-compose restart nginx
 if [ $? -ne 0 ]; then
   log_error "Failed to restart Nginx"
   log "Dumping Nginx logs:"
-  docker-compose logs --tail=50 nginx >> $LOG_FILE 2>&1
+  sudo -E docker-compose logs --tail=50 nginx >> $LOG_FILE 2>&1
 else
   log "Nginx restarted successfully"
 fi
 
 # Check if Nginx config is valid
-docker-compose exec -T nginx nginx -t 2>&1 | tee -a $LOG_FILE
+sudo -E docker-compose exec -T nginx nginx -t 2>&1 | tee -a $LOG_FILE
 if [ ${PIPESTATUS[0]} -ne 0 ]; then
   log_error "Nginx configuration test failed"
   log "Dumping Nginx configuration:"
-  docker-compose exec -T nginx nginx -T >> $LOG_FILE 2>&1
+  sudo -E docker-compose exec -T nginx nginx -T >> $LOG_FILE 2>&1
 else
   log "Nginx configuration is valid"
 fi
@@ -327,7 +327,7 @@ fi
 
 # List certificates for verification
 log "Listing installed certificates:"
-docker-compose exec -T certbot certbot certificates 2>&1 | tee -a $LOG_FILE
+sudo -E docker-compose exec -T certbot certbot certificates 2>&1 | tee -a $LOG_FILE
 
 log "SSL setup complete for $DOMAIN_NAME!"
 log "Your site should now be accessible at: https://$DOMAIN_NAME"

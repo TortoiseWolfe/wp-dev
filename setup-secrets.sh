@@ -1,13 +1,13 @@
 #!/bin/bash
-# Script to generate and export secret values as environment variables for Docker
+# Script to pull secret values from Google Secret Manager and export as environment variables for Docker
 
-# Generate random passwords
-export MYSQL_ROOT_PASSWORD=$(tr -dc 'A-Za-z0-9!#$%&*+-' < /dev/urandom | head -c 12)
-export MYSQL_PASSWORD=$(tr -dc 'A-Za-z0-9!#$%&*+-' < /dev/urandom | head -c 12)
+# Get secrets from Google Secret Manager
+export MYSQL_ROOT_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD")
+export MYSQL_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_PASSWORD")
 export WORDPRESS_DB_PASSWORD=$MYSQL_PASSWORD
-export WP_ADMIN_PASSWORD=$(tr -dc 'A-Za-z0-9!#$%&*+-' < /dev/urandom | head -c 12)
-export WP_ADMIN_EMAIL="admin@example.com"
-export GITHUB_TOKEN="ghp_dummy_token_for_local_dev"
+export WP_ADMIN_PASSWORD=$(gcloud secrets versions access latest --secret="WP_ADMIN_PASSWORD")
+export WP_ADMIN_EMAIL=$(gcloud secrets versions access latest --secret="WP_ADMIN_EMAIL")
+export GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
 
 # Update .env file with the secrets - Docker Compose will use these values
 sed -i.bak "/# Added automatically by setup-secrets.sh/d" .env
@@ -76,4 +76,4 @@ fi
 echo "Secret values exported to environment variables. You can now run Docker Compose."
 echo "Usage: sudo -E docker-compose up -d"
 echo "⚠️  CRITICAL REMINDER: You MUST log in to Docker registry AFTER sourcing this script:"
-echo "echo \$GITHUB_TOKEN | sudo -E docker login ghcr.io -u tortoisewolfe -p \$GITHUB_TOKEN"
+echo "sudo -E docker login ghcr.io -u tortoisewolfe --password \"\$GITHUB_TOKEN\""
