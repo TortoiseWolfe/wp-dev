@@ -55,19 +55,12 @@ services:
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT:-false}
+      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT}
     volumes:
       - wp_data:/var/www/html
     # Run setup and conditionally run demo-content
     command: >
-      bash -c "/usr/local/bin/scripts/setup.sh && 
-              if [ \"$${SKIP_DEMO_CONTENT}\" = \"true\" ]; then
-                echo 'Demo content installation skipped.';
-              else
-                echo 'Running demo content installation...' &&
-                sleep 10 && 
-                /usr/local/bin/devscripts/demo-content.sh;
-              fi"
+      bash -c "/usr/local/bin/scripts/setup.sh"
     restart: "no"
     networks:
       - wordpress_network
@@ -77,7 +70,7 @@ services:
     build:
       context: .
       target: production
-    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
     depends_on:
       - db
     expose:
@@ -105,7 +98,7 @@ services:
       - wordpress_network
     
   wp-prod-setup:
-    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
     depends_on:
       - wordpress-prod
     environment:

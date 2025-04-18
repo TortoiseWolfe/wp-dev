@@ -1,7 +1,7 @@
 # WordPress Development Environment Guidelines
 
 ## ⚠️ ATTENTION CLAUDE: CHECK MEMORY LOG FIRST! ⚠️
-When starting a new session, IMMEDIATELY check `/home/jonpohlner/memory_log.txt` first to restore context. DO NOT GIVE UP due to system load - the system can handle it despite high load and limited RAM. Follow the critical sequence in memory_log.txt completely.
+When starting a new session, IMMEDIATELY check `/memory_log.txt` first to restore context. DO NOT GIVE UP due to system load - the system can handle it despite high load and limited RAM. Follow the critical sequence in memory_log.txt completely.
 
 ## ✅ ENVIRONMENT VARIABLE SOLUTION IMPLEMENTED ✅
 The issue with environment variables not being passed to containers has been fixed by modifying the setup-secrets.sh script to update the .env file with actual secret values. Docker Compose prioritizes .env file over shell environment variables, which was causing the issue.
@@ -9,7 +9,7 @@ The issue with environment variables not being passed to containers has been fix
 ## ✅ WP-CLI AUTOMATION OPTIMIZED ✅
 WP-CLI auto-installation now uses a streamlined approach:
 1. Direct WordPress install commands in docker-compose.yml
-2. Using the versioned v0.1.0 image from GitHub Container Registry
+2. Using the versioned v0.1.1 image from GitHub Container Registry
 3. Consistent setup with proper MySQL database configuration
 4. Setup completes automatically with proper environment variables
 
@@ -36,9 +36,10 @@ The WordPress setup in WSL (Windows Subsystem for Linux) has been enhanced:
    - In WSL, the script automatically detects and uses your WSL IP address for proper permalink functionality
 2. Run `sudo -E docker-compose up -d wordpress wp-setup db` to start dev containers
 3. Access WordPress at:
-   - Windows/Mac: http://localhost:8000
-   - WSL: Use the IP address shown in the setup script output (typically http://172.x.x.x:8000)
-   - The setup automatically configures WordPress with the correct WSL IP for proper permalink functionality
+   - When running in WSL, you MUST use the IP address: http://172.x.x.x:8000 (exact IP shown during setup)
+   - WARNING: Using "localhost" in WSL will cause broken links and connection failures
+   - From Windows host, also use the WSL IP address shown during setup
+   - The setup automatically configures WordPress with the correct WSL IP for proper functionality
 4. Always use sudo with Docker commands to avoid permission errors
 5. All permalinks should work automatically - no manual configuration needed
 6. The demo content creation process continues in the background after initial setup - wait for it to complete before testing all site functionality
@@ -60,14 +61,14 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
    # ALWAYS run these steps in sequence:
    source ./setup-secrets.sh
    sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
-   sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+   sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
    ```
 
 ## Production Image with Security Hardening
 - Security-hardened production image with Apache security configurations
 - Nginx reverse proxy with SSL termination for HTTPS support
 - Versioned image tagging for reliable deployment and rollback
-- Container Registry: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+- Container Registry: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 - Reduced attack surface with minimal packages and proper permissions
 - Health checks for container orchestration reliability
 
@@ -170,7 +171,7 @@ The setup process has been optimized by directly executing WordPress installatio
    sudo -E docker compose exec wordpress-prod wp plugin list --allow-root
    ```
 
-The system now uses the v0.1.0 versioned image from the container registry with core installation automated in the docker-compose configuration. No manual troubleshooting of WP-CLI should be needed.
+The system now uses the v0.1.1 versioned image from the container registry with core installation automated in the docker-compose configuration. No manual troubleshooting of WP-CLI should be needed.
 
 ### ⚠️ TROUBLESHOOTING SSL ISSUES ⚠️
 If you encounter SSL/HTTPS configuration issues:
@@ -246,7 +247,7 @@ If you encounter SSL/HTTPS configuration issues:
 
 3. **Pull the hardened production image**:
    ```bash
-   docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+   docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
    ```
 
 4. **Create and configure environment with secrets from Google Secret Manager**:
@@ -316,14 +317,14 @@ sudo -E docker-compose up -d wordpress wp-setup db
 #### Build Production Image:
 ```bash
 # Build and tag a versioned production image
-sudo docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
+sudo docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.1 .
 
 # Get GitHub token from Google Secret Manager
 GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
 
 # Push to GitHub Container Registry
 sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
-sudo -E docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+sudo -E docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 ```
 
 #### Test Production Image Locally:
@@ -352,7 +353,7 @@ git pull origin main
 # 4. Pull latest image using GitHub token from Google Secret Manager
 GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="GITHUB_TOKEN")
 sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
-sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 
 # 5. Deploy with docker-compose
 sudo -E docker-compose up -d
@@ -400,6 +401,66 @@ sudo -E docker-compose up -d
   - GamiPress-BuddyPress Integration: Connects both systems for social gamification
 
 ## Development Roadmap & Best Practices
+
+### Roadmap (2025-2026)
+
+#### Phase 1: Infrastructure and Security 
+- [x] Fix script permissions (`chmod +x setup.sh EnhancedBoot/enhanced-boot.sh devscripts/demo-content.sh`)
+- [x] Add nginx reverse proxy with SSL termination for production
+- [x] Implement versioned image tagging for better deployment management
+- [ ] Add specific version pinning for dependencies in Dockerfile
+- [ ] Create separate docker-compose.prod.yml for production configuration
+- [ ] Consider using Docker secrets for sensitive data instead of environment variables
+- [x] Add HTTPS configuration with Let's Encrypt for production via nginx
+- [x] Implement basic Apache security hardening (ServerTokens, ServerSignature, TraceEnable)
+- [x] Set proper file permissions for WordPress files
+- [x] Create automated SSL certificate setup script (get-certificates.sh)
+- [x] Document SSL configuration procedure in README
+- [ ] Implement additional PHP security configurations
+- [ ] Add firewall configuration examples for production servers
+- [ ] Add comprehensive security scanning in CI/CD pipeline
+
+#### Phase 2: Performance and Content Improvement
+- [ ] **Demo Content Refinement**
+  - [ ] Expand tutorial content with more real-world examples
+  - [ ] Create specialized curriculum paths for different learning needs
+  - [ ] Add interactive code examples
+- [ ] **Performance Optimization**
+  - [ ] Add Redis or Memcached caching for WordPress
+  - [ ] Optimize image handling and database queries
+  - [ ] Implement CDN integration for static assets
+  - [ ] Reduce Docker image size
+- [ ] Document load testing procedures
+- [ ] Add caching recommendations for production
+
+#### Phase 3: DevOps & Monitoring
+- [x] Document Google Secret Manager workflow for accessing GitHub tokens
+- [x] Document workflow from development to production deployment
+- [ ] **CI/CD Pipeline**
+  - [ ] Create GitHub Actions workflows for automated testing and deployment
+  - [ ] Implement blue/green deployments for zero-downtime updates
+  - [ ] Document required GitHub secrets for GitHub Actions workflow
+- [ ] **Monitoring and Logging**
+  - [ ] Add centralized logging with ELK or similar stack
+  - [ ] Implement monitoring with Prometheus and Grafana
+  - [ ] Create alerting for critical system events
+- [ ] Enhance health checks for production containers
+
+#### Phase 4: Scaling & Recovery
+- [ ] **Multi-environment Support**
+  - [ ] Create staging environment configuration
+  - [ ] Document environment-specific configurations
+  - [ ] Add proper environment detection in scripts
+- [ ] **Backup & Recovery**
+  - [ ] Add example scripts for automated backups
+  - [ ] Document a complete disaster recovery procedure
+  - [ ] Test and document restore procedures
+- [ ] **Documentation**
+  - [ ] Add environment variable validation in scripts
+  - [ ] Document routine maintenance tasks
+  - [ ] Add WordPress core and plugin update strategy
+  - [ ] Create troubleshooting guide for common issues
+  - [ ] Create architecture diagrams
 
 ### Infrastructure Improvements
 - [x] Fix script permissions (`chmod +x setup.sh EnhancedBoot/enhanced-boot.sh devscripts/demo-content.sh`)

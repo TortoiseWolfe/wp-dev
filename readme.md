@@ -4,7 +4,7 @@ This repository provides a Docker-based WordPress development environment with B
 
 ## Hardened Production Image
 
-The v0.1.0 release includes a security-hardened production image with:
+The v0.1.1 release includes a security-hardened production image with:
 - Nginx reverse proxy with SSL termination
 - Apache security hardening
 - Proper file permissions
@@ -14,7 +14,7 @@ The v0.1.0 release includes a security-hardened production image with:
 To use the hardened production image:
 ```bash
 # Build the versioned production image locally
-docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
+docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.1 .
 
 # Push to GitHub Container Registry (requires proper token setup)
 # 1. Create a GitHub PAT with write:packages and read:packages permissions
@@ -22,7 +22,7 @@ docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
 # 3. Login with: 
 # IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-# 4. Push: docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+# 4. Push: docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 
 # Run the complete hardened production stack
 docker-compose up -d   # Starts all services including nginx and certbot
@@ -247,7 +247,7 @@ source ./setup-secrets.sh
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
 
 # 3. Now you can pull images
-sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 ```
 
 ⚠️ **IMPORTANT**: Skipping any of these steps will result in authentication errors!
@@ -270,7 +270,7 @@ cp .env.example .env && nano .env  # Edit with production values
 # Deploy the complete hardened production stack
 # IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 docker-compose up -d
 docker-compose ps  # Verify status
 ```
@@ -293,7 +293,7 @@ set -o pipefail
 # ----------------------
 PROJECT_DIR="/var/www/wp-dev"                           # Path to your project
 BRANCH="main"                                           # Branch to deploy
-GHCR_IMAGE="ghcr.io/tortoisewolfe/wp-dev:v0.1.0"  # Production image with versioned tag
+GHCR_IMAGE="ghcr.io/tortoisewolfe/wp-dev:v0.1.1"  # Production image with versioned tag
 DOCKER_COMPOSE_FILE="${PROJECT_DIR}/docker-compose.yml" # Docker Compose file path
 
 # ----------------------
@@ -366,8 +366,8 @@ To upgrade your production environment:
 # ON YOUR LOCAL MACHINE
 # Update your code, then build and push a new versioned image
 # IMPORTANT: Always use specific version tags, not 'latest'
-docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.0 .
-docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.1 .
+docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 ```
 
 2. On the production server, either:
@@ -381,9 +381,9 @@ cd /var/www/wp-dev
 git pull  # Update docker-compose.yml and scripts if needed
 
 # Update the image version in docker-compose.yml:
-# image: ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+# image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 
-docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.0
+docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 docker-compose down    # Stop all services
 docker-compose up -d   # Start all services with the updated image
 ```

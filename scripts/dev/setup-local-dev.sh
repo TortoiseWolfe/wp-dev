@@ -76,22 +76,24 @@ if [ -z "$LOCAL_IP" ]; then
 fi
 
 if [ -z "$LOCAL_IP" ]; then
-  # If we can't detect the IP, use localhost
-  echo "Could not detect IP address, using localhost"
+  # If we can't detect the IP, use localhost but show a warning
+  echo "WARNING: Could not detect IP address. Using localhost, but this may cause connectivity issues in WSL."
   LOCAL_IP="localhost"
   export WP_SITE_URL="http://localhost:8000"
 else
   echo "===== IP ADDRESS DETECTED: $LOCAL_IP ====="
   echo "WordPress will be available at:"
-  echo "- From this machine: http://localhost:8000"
-  echo "- From other machines: http://$LOCAL_IP:8000"
+  echo "- From this machine running in WSL: http://$LOCAL_IP:8000"
+  echo "- From Windows host or other machines: http://$LOCAL_IP:8000"
+  echo "NOTE: In WSL, you must use the IP address, not localhost!"
   
-  # Set WP_SITE_URL to the detected IP address
+  # Always set WP_SITE_URL to the detected IP address in WSL
   export WP_SITE_URL="http://$LOCAL_IP:8000"
-  # Update .env with the IP address
-  sed -i.bak "/^WP_SITE_URL=/d" .env
-  echo "WP_SITE_URL=http://$LOCAL_IP:8000" >> .env
-  echo "IMPORTANT: Site URL set to http://$LOCAL_IP:8000 for proper functionality"
 fi
+
+# Always update .env with the IP address to ensure consistency
+sed -i.bak "/^WP_SITE_URL=/d" .env
+echo "WP_SITE_URL=http://$LOCAL_IP:8000" >> .env
+echo "IMPORTANT: Site URL set to http://$LOCAL_IP:8000 for proper functionality"
 
 echo "Admin login: ${WP_ADMIN_USER:-admin} / $WP_ADMIN_PASSWORD"

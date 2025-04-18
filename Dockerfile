@@ -7,8 +7,8 @@ FROM wordpress:6.4-apache AS production
 
 # Labels for maintainability
 LABEL maintainer="YourName <your.email@example.com>"
-LABEL description="WordPress with BuddyPress and BuddyX theme - Production Ready"
-LABEL version="1.0"
+LABEL description="WordPress with BuddyPress, GamiPress and BuddyX theme - Production Ready"
+LABEL version="1.1"
 
 # Run as root for setup
 USER root

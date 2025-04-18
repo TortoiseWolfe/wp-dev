@@ -3,6 +3,30 @@ set -e
 
 echo "Starting WordPress development data population..."
 
+# Show usage information if help parameter is provided
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: $0 [OPTION]"
+    echo "Populate WordPress with demo and tutorial content."
+    echo ""
+    echo "Options:"
+    echo "  --skip-all            Skip all random demo content (users, posts, groups)"
+    echo "  --skip-users, -s      Skip creating example users"
+    echo "  --skip-posts, -s      Skip creating example posts"
+    echo "  --skip-groups, -s     Skip creating BuddyPress groups"
+    echo "  --help, -h            Display this help and exit"
+    echo ""
+    echo "Note: Tutorial content will always be created regardless of options."
+    exit 0
+fi
+
+# Check if we should skip all demo content
+if [ "$1" = "--skip-all" ]; then
+    echo "Skipping all random demo content (users, posts, groups). Only tutorial content will be created."
+    SKIP_DEMO=true
+else
+    SKIP_DEMO=false
+fi
+
 # Check if WordPress is installed
 if ! wp core is-installed --path=/var/www/html; then
     echo "WordPress is not installed. Please run setup.sh first."
@@ -44,24 +68,29 @@ last_names=(
     "Brutus" "Cassius" "Scipio" "Gracchus" "Sulla" "Marius" "Crassus" "Agrippa" "Tiberius" "Claudius"
 )
 
-# Create 20 example users with Latin names
-for i in {1..20}; do
-    # Select random first and last name
-    rand_first=$((RANDOM % ${#first_names[@]}))
-    rand_last=$((RANDOM % ${#last_names[@]}))
-    
-    first_name="${first_names[$rand_first]}"
-    last_name="${last_names[$rand_last]}"
-    username=$(echo "${first_name}${last_name}" | tr '[:upper:]' '[:lower:]')
-    email="$username@example.com"
-    password="password"
-    
-    if ! wp user get "$username" --path=/var/www/html --field=user_login &>/dev/null; then
-        wp user create "$username" "$email" --user_pass="$password" --first_name="$first_name" --last_name="$last_name" --role=subscriber --path=/var/www/html
-    else
-        echo "User $username already exists. Skipping."
-    fi
-done
+# Check if we should skip demo content creation
+if $SKIP_DEMO || [ "$1" = "--skip-users" ] || [ "$1" = "-s" ]; then
+    echo "Skipping example users creation..."
+else
+    # Create only 5 example users with Latin names for reduced load
+    for i in {1..5}; do
+        # Select random first and last name
+        rand_first=$((RANDOM % ${#first_names[@]}))
+        rand_last=$((RANDOM % ${#last_names[@]}))
+        
+        first_name="${first_names[$rand_first]}"
+        last_name="${last_names[$rand_last]}"
+        username=$(echo "${first_name}${last_name}" | tr '[:upper:]' '[:lower:]')
+        email="$username@example.com"
+        password="password"
+        
+        if ! wp user get "$username" --path=/var/www/html --field=user_login &>/dev/null; then
+            wp user create "$username" "$email" --user_pass="$password" --first_name="$first_name" --last_name="$last_name" --role=subscriber --path=/var/www/html
+        else
+            echo "User $username already exists. Skipping."
+        fi
+    done
+fi
 
 echo "Setting up post categories..."
 # Categories for posts
@@ -96,16 +125,20 @@ for category in "${categories[@]}"; do
 done
 
 echo "Creating example posts..."
-# Create 20 example posts randomly assigned to different users and categories
-for i in {1..20}; do
-    # Get random user ID between 2-11 (skipping admin which is usually ID 1)
-    user_id=$((RANDOM % 10 + 2))
-    
-    # Check if user exists
-    if ! wp user get $user_id --path=/var/www/html &>/dev/null; then
-        echo "User with ID $user_id doesn't exist. Using admin instead."
-        user_id=1
-    fi
+# Check if we should skip demo posts
+if $SKIP_DEMO || [ "$1" = "--skip-posts" ] || [ "$1" = "-s" ]; then
+    echo "Skipping example posts creation..."
+else
+    # Create only 5 example posts randomly assigned to different users and categories for reduced load
+    for i in {1..5}; do
+        # Get random user ID between 2-6 (skipping admin which is usually ID 1)
+        user_id=$((RANDOM % 5 + 2))
+        
+        # Check if user exists
+        if ! wp user get $user_id --path=/var/www/html &>/dev/null; then
+            echo "User with ID $user_id doesn't exist. Using admin instead."
+            user_id=1
+        fi
     
     # Array of interesting post titles
     post_titles=(
@@ -167,12 +200,12 @@ for i in {1..20}; do
     
     echo "Created post ID: $post_id by user ID: $user_id in category: ${categories[$rand_category_index]}"
     
-    # Add between 1-5 comments to each post
-    comment_count=$((RANDOM % 5 + 1))
-    for j in {1..5}; do
+    # Add only 1-2 comments to each post for reduced load
+    comment_count=$((RANDOM % 2 + 1))
+    for j in {1..2}; do
         if [ $j -le $comment_count ]; then
             # Get random user ID for comment
-            commenter_id=$((RANDOM % 10 + 2))
+            commenter_id=$((RANDOM % 5 + 2))
             if ! wp user get $commenter_id --path=/var/www/html &>/dev/null; then
                 commenter_id=1
             fi
@@ -231,6 +264,7 @@ for i in {1..20}; do
         fi
     done
 done
+fi
 
 echo "Creating sample pages..."
 # Create philosophical pages
@@ -440,12 +474,16 @@ fi
 if wp plugin is-active buddypress --path=/var/www/html && wp bp component list --path=/var/www/html | grep -q 'groups.*true'; then
     echo "Creating BuddyPress groups and activities..."
     
-    # Create 5 BuddyPress groups
-    for i in {1..5}; do
-        creator_id=$((RANDOM % 10 + 2))
-        if ! wp user get $creator_id --path=/var/www/html &>/dev/null; then
-            creator_id=1
-        fi
+    # Check if we should skip group creation
+    if $SKIP_DEMO || [ "$1" = "--skip-groups" ] || [ "$1" = "-s" ]; then
+        echo "Skipping BuddyPress groups creation..."
+    else
+        # Create only 2 BuddyPress groups for reduced load
+        for i in {1..2}; do
+            creator_id=$((RANDOM % 5 + 2))
+            if ! wp user get $creator_id --path=/var/www/html &>/dev/null; then
+                creator_id=1
+            fi
         
         # Array of philosophical group names and descriptions
         group_names=(
@@ -542,6 +580,7 @@ if wp plugin is-active buddypress --path=/var/www/html && wp bp component list -
             wp bp activity create --component=groups --type=activity_update --user-id="$activity_author" --content="$activity_content" --item-id="$group_id" --path=/var/www/html
         done
     done
+    fi
 fi
 
 # region: TUTORIAL CONTENT CREATION

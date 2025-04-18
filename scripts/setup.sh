@@ -97,4 +97,16 @@ wp bp component list --format=json --path=/var/www/html | grep -o '"component_id
     wp bp component activate "$component" --path=/var/www/html || echo "Failed to activate $component, continuing..."
 done
 
+# Check for demo content flag and run the script if not skipped
+if [ "${SKIP_DEMO_CONTENT}" != "true" ]; then
+  echo "Creating FULL demo content (users, posts, groups, tutorials)..."
+  /usr/local/bin/devscripts/demo-content.sh
+else
+  echo "Skipping random demo content, but still creating tutorial content..."
+  # Still create tutorial content even when skipping demo content
+  /usr/local/bin/devscripts/demo-content.sh --skip-all
+fi
+
+echo "Content creation process started in background - it may take a few minutes to complete."
+
 echo "Setup completed successfully."
