@@ -52,13 +52,42 @@ fi
 echo "Activating BuddyPress plugin..."
 wp plugin activate buddypress --path=/var/www/html || handle_error $LINENO
 
+# Install GamiPress plugins (always)
+echo "Installing GamiPress plugins..."
+wp plugin install gamipress --activate --path=/var/www/html || handle_error $LINENO
+# Install additional GamiPress add-ons
+wp plugin install gamipress-buddypress-integration --activate --path=/var/www/html || echo "Warning: Could not install GamiPress-BuddyPress integration"
+
 echo "Activating BuddyX theme..."
 wp theme activate buddyx --path=/var/www/html || handle_error $LINENO
 
-# Set permalink structure
-echo "Setting permalink structure..."
+# Set permalink structure and ensure site URL is correct
+echo "Setting permalink structure and ensuring site URLs are correct..."
 wp option update permalink_structure '/%postname%/' --path=/var/www/html
+wp option update siteurl "${WP_SITE_URL}" --path=/var/www/html
+wp option update home "${WP_SITE_URL}" --path=/var/www/html
 wp rewrite flush --path=/var/www/html
+wp rewrite structure '/%postname%/' --path=/var/www/html
+
+# Create .htaccess if it doesn't exist
+if [ ! -f /var/www/html/.htaccess ]; then
+  echo "Creating .htaccess file for permalinks..."
+  cat > /var/www/html/.htaccess << 'EOF'
+# BEGIN WordPress
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress
+EOF
+  # Set proper permissions
+  chown www-data:www-data /var/www/html/.htaccess
+  chmod 644 /var/www/html/.htaccess
+fi
 
 # Enable BuddyPress components one by one with error handling
 echo "Enabling BuddyPress components..."

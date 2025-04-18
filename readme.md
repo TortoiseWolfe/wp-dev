@@ -45,6 +45,36 @@ docker-compose up -d   # Starts all services including nginx and certbot
 - [Troubleshooting](#troubleshooting)
 - [Additional Resources](#additional-resources)
 
+## Directory Structure
+
+The repository is organized as follows:
+
+```
+wp-dev/
+├── devscripts/         # WordPress content scripts and PHP files
+├── docs/               # Documentation files
+│   ├── CLAUDE.md       # Claude AI instructions and project documentation
+│   └── pull-log.txt    # Log of GitHub pulls
+├── nginx/              # Nginx configuration
+│   ├── conf/           # Server configuration files
+│   └── ssl/            # SSL certificates
+├── scripts/            # Shell scripts for setup and maintenance
+│   ├── dev/            # Development-specific scripts
+│   │   ├── setup-local-dev.sh       # Local development setup
+│   │   └── setup-secrets-local.sh   # Local secrets management
+│   ├── db/             # Database management scripts
+│   ├── prod/           # Production-specific scripts
+│   ├── ssl/            # SSL setup and debugging
+│   │   ├── ssl-debug.sh   # Debugging SSL issues
+│   │   └── ssl-setup.sh   # Setup SSL certificates
+│   ├── enhanced-boot.sh   # Enhanced container boot script
+│   ├── setup.sh           # Main WordPress setup script
+│   └── setup-secrets.sh   # Production secrets management
+├── docker-compose.yml  # Docker Compose configuration
+├── Dockerfile          # Multi-stage Dockerfile
+└── .env                # Environment variables (populated by setup scripts)
+```
+
 ## Initial Setup
 
 ### 1. Clone the Repository
@@ -88,19 +118,37 @@ chmod 600 ~/.ssh/config
 ```
 
 ```bash
+# Copy example environment variables
 cp .env.example .env
-```
 
-```bash
+# For local development (without Google Secret Manager)
+source ./scripts/dev/setup-local-dev.sh
+
+# For production (with Google Secret Manager)
+source ./scripts/setup-secrets.sh
+
+# Start containers
 docker-compose up -d
 ```
 
 This will:
-- Start WordPress at http://localhost:8000
+- Start WordPress at http://localhost:8000 (or your WSL IP address)
 - Set up a MySQL database
 - Run the setup script to configure WordPress and BuddyPress
 
 ## Development Workflow
+
+### WSL Development Notes
+
+When developing using Windows Subsystem for Linux (WSL), note that:
+
+1. **Accessing WordPress**: The WordPress site won't be accessible via `localhost` from Windows browsers
+2. **Use WSL IP Address**: Use the IP address of your WSL instance instead:
+   ```
+   http://<WSL-IP-ADDRESS>:8000
+   ```
+3. **Finding WSL IP**: Run `hostname -I` in your WSL terminal to get the IP address
+4. **Automatic Detection**: The setup script automatically detects WSL and displays the correct URL
 
 ### Running the Environment
 

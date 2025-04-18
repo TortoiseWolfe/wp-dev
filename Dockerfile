@@ -25,18 +25,24 @@ RUN wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.ph
     # Verify the download
     wp --info
 
-# Download and extract BuddyPress plugin and BuddyX theme
+# Download and extract BuddyPress plugin, BuddyX theme, and GamiPress
 RUN mkdir -p /usr/src/wordpress/wp-content/plugins /usr/src/wordpress/wp-content/themes && \
     wget https://downloads.wordpress.org/plugin/buddypress.latest-stable.zip -O buddypress.zip && \
     unzip buddypress.zip -d /usr/src/wordpress/wp-content/plugins && \
     rm buddypress.zip && \
+    wget https://downloads.wordpress.org/plugin/gamipress.latest-stable.zip -O gamipress.zip && \
+    unzip gamipress.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm gamipress.zip && \
+    wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
+    unzip gamipress-bp.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm gamipress-bp.zip && \
     wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
     unzip buddyx.zip -d /usr/src/wordpress/wp-content/themes && \
     rm buddyx.zip
 
-# Copy only production scripts
-COPY setup.sh /usr/local/bin/setup.sh
-RUN chmod +x /usr/local/bin/setup.sh
+# Copy scripts
+COPY scripts/ /usr/local/bin/scripts/
+RUN chmod +x /usr/local/bin/scripts/*.sh /usr/local/bin/scripts/*/*.sh
 
 # Copy only production scripts from devscripts
 COPY devscripts/ally-content /usr/local/bin/devscripts/ally-content
@@ -51,6 +57,8 @@ RUN chown -R www-data:www-data /var/www/html /usr/src/wordpress
 RUN \
     # Remove default Apache configs that could be security issues
     a2dismod -f autoindex && \
+    # Enable mod_rewrite for permalinks
+    a2enmod rewrite && \
     # Set proper file permissions
     find /var/www/html -type d -exec chmod 755 {} \; && \
     find /var/www/html -type f -exec chmod 644 {} \;
@@ -86,21 +94,27 @@ RUN apt-get update && apt-get install -y wget unzip default-mysql-client
 RUN wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /usr/local/bin/wp && \
     chmod +x /usr/local/bin/wp
 
-# Download and extract BuddyPress plugin into the source plugins directory
-RUN mkdir -p /usr/src/wordpress/wp-content/plugins && \
+# Download and extract BuddyPress plugin, BuddyX theme, and GamiPress plugins
+RUN mkdir -p /usr/src/wordpress/wp-content/plugins /usr/src/wordpress/wp-content/themes && \
     wget https://downloads.wordpress.org/plugin/buddypress.latest-stable.zip -O buddypress.zip && \
     unzip buddypress.zip -d /usr/src/wordpress/wp-content/plugins && \
-    rm buddypress.zip
-
-# Download and extract BuddyX theme into the source themes directory
-RUN mkdir -p /usr/src/wordpress/wp-content/themes && \
+    rm buddypress.zip && \
+    wget https://downloads.wordpress.org/plugin/gamipress.latest-stable.zip -O gamipress.zip && \
+    unzip gamipress.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm gamipress.zip && \
+    wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
+    unzip gamipress-bp.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm gamipress-bp.zip && \
     wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
     unzip buddyx.zip -d /usr/src/wordpress/wp-content/themes && \
     rm buddyx.zip
 
-# Copy the automated setup script into the image
-COPY setup.sh /usr/local/bin/setup.sh
-RUN chmod +x /usr/local/bin/setup.sh
+# Enable Apache modules needed for WordPress
+RUN a2enmod rewrite
+
+# Copy the scripts into the image
+COPY scripts/ /usr/local/bin/scripts/
+RUN chmod +x /usr/local/bin/scripts/*.sh /usr/local/bin/scripts/*/*.sh
 
 # Copy the devscripts directory
 COPY devscripts /usr/local/bin/devscripts

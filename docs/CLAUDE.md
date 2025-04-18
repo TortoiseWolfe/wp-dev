@@ -13,11 +13,35 @@ WP-CLI auto-installation now uses a streamlined approach:
 3. Consistent setup with proper MySQL database configuration
 4. Setup completes automatically with proper environment variables
 
+## ✅ WSL COMPATIBILITY IMPROVED ✅
+The WordPress setup in WSL (Windows Subsystem for Linux) has been enhanced:
+1. Apache mod_rewrite now properly enabled for permalink functionality
+2. Automatic IP detection for proper site URL configuration
+3. WordPress configured with correct site URL for permalinks to work
+4. Proper .htaccess file creation for WordPress rewrite rules
+5. Note: Demo content creation is still in progress after initial setup
+
 ## ⚠️ CRITICAL REQUIREMENT: ALWAYS FOLLOW THIS SEQUENCE ⚠️
-1. Run `source ./setup-secrets.sh` first (this now updates .env file automatically)
+
+### For Production Environment:
+1. Run `source ./scripts/setup-secrets.sh` first (this updates .env file automatically with GSM secrets)
 2. Run `sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"` 
 3. Run `sudo -E docker-compose up -d [services]` to start containers
 4. Always use sudo with Docker commands to avoid permission errors ("Error: kill EPERM")
+
+### For Local Development Environment:
+1. Run `source ./scripts/dev/setup-local-dev.sh` to generate secure local development credentials
+   - GamiPress plugin is always installed automatically
+   - You'll be asked if you want to skip demo content installation
+   - In WSL, the script automatically detects and uses your WSL IP address for proper permalink functionality
+2. Run `sudo -E docker-compose up -d wordpress wp-setup db` to start dev containers
+3. Access WordPress at:
+   - Windows/Mac: http://localhost:8000
+   - WSL: Use the IP address shown in the setup script output (typically http://172.x.x.x:8000)
+   - The setup automatically configures WordPress with the correct WSL IP for proper permalink functionality
+4. Always use sudo with Docker commands to avoid permission errors
+5. All permalinks should work automatically - no manual configuration needed
+6. The demo content creation process continues in the background after initial setup - wait for it to complete before testing all site functionality
 
 ## ⚠️ GITHUB AUTHENTICATION ERROR RESOLUTION ⚠️
 If you encounter "Error response from daemon: Head: unauthorized" or "Error response from daemon: denied" when pulling Docker images:
@@ -131,7 +155,7 @@ The setup process has been optimized by directly executing WordPress installatio
 1. **Production Environment Setup**:
    ```bash
    # ALWAYS USE THIS SEQUENCE (in order):
-   source ./setup-secrets.sh
+   source ./scripts/setup-secrets.sh
    sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
    sudo -E docker compose down -v
    sudo -E docker compose up -d
@@ -230,7 +254,14 @@ If you encounter SSL/HTTPS configuration issues:
    # Create directory structure if needed
    mkdir -p /var/www/wp-dev
    
-   # Create .env file populated with secrets from Google Secret Manager
+   # Clone the repository if needed
+   git clone https://github.com/TortoiseWolfe/wp-dev.git /var/www/wp-dev
+   cd /var/www/wp-dev
+   
+   # Run the secrets setup script (which populates .env automatically)
+   source ./scripts/setup-secrets.sh
+   
+   # Alternatively, create .env file manually with secrets from Google Secret Manager
    cat > /var/www/wp-dev/.env << EOF
    # MySQL credentials
    MYSQL_ROOT_PASSWORD=$(gcloud secrets versions access latest --secret="MYSQL_ROOT_PASSWORD")
@@ -360,9 +391,13 @@ sudo -E docker-compose up -d
 - Use prefix for custom functions to avoid conflicts
 
 ## Environment
-- WordPress with BuddyPress using Docker
+- WordPress with BuddyPress and GamiPress using Docker
 - Database credentials stored in environment variables
 - WordPress configuration managed via wp-config.php
+- Plugins installed automatically:
+  - BuddyPress: Social networking features
+  - GamiPress: Gamification system with achievements, points, and ranks
+  - GamiPress-BuddyPress Integration: Connects both systems for social gamification
 
 ## Development Roadmap & Best Practices
 
@@ -444,39 +479,51 @@ Educational modules focused on allyship in the workplace with interactive learni
 
 ## Gamification
 
-### Implementation Approach: Simple Visual Gamification
+### Implementation Approaches
 
-Both curricula include basic gamification elements to enhance the learning experience:
+The environment supports two different approaches to gamification:
 
-#### Core Features
+#### 1. Simple Visual Gamification (Original Implementation)
+
+A lightweight client-side implementation that enhances the learning experience:
+
 - **Visual Progress Tracking**: Progress bar showing completion status (dynamically calculated)
 - **Completed Tutorial Indicators**: Visual markers (checkmarks, color changes) for completed tutorials
 - **Achievement Badges**: Multiple achievements for different tutorial completions
 - **Points System**: Basic points with bonuses for section completion
 - **Achievement Tracking**: Both unlocked and locked achievements displayed
+- **Implementation Method**: JavaScript and cookie-based tracking
 
-#### Visual Implementation
-- **Progress Bar**: Shows overall tutorial completion percentage dynamically based on cookie data
-- **Checkmarks**: Green checkmarks next to completed tutorials appear automatically
-- **Color Coding**: Green left borders for completed tutorials appear automatically
-- **Achievements Section**: Color-coded achievement cards unlock based on tutorial completion
-- **Locked Achievements**: Greyed-out achievements that indicate what's needed to unlock them
-- **Per-Tutorial Gamification**: Each individual tutorial page has:
-  - Tutorial progress tracking at the top and bottom
-  - Completion status indicators
-  - Working "Mark as Complete" buttons that store progress in browser cookies
-  - "Continue to Next Tutorial" links that appear after completion
-  - Navigation back to the curriculum page
+#### 2. GamiPress Integration (Enhanced Implementation)
 
-#### Gamification Mechanics
-- Base points (100) awarded for each completed tutorial
-- Bonus points (150) awarded for completing a section
-- Major achievement (500 bonus points) for completing all tutorials
-- Visual progress tracking with dynamic percentage calculation
-- Achievement unlocks tied to specific tutorial completions
-- Browser cookie storage for tracking completed tutorials
-- Progress persists between page loads and can be reset
-- No database storage needed - client-side implementation
-- Progress is tracked per browser, not per user account
+A more robust plugin-based implementation that offers advanced gamification features:
 
-This simple implementation provides a clear demonstration of how gamification techniques can enhance the learning experience without requiring complex plugins or database integration.
+- **Achievement System**: Configurable achievements based on user actions
+- **Points Management**: Multiple point types with automatic tracking
+- **Ranks and Levels**: Progressive user ranks based on points and achievements
+- **Leaderboards**: Competitive displays of user progress and achievements 
+- **Rewards**: Ability to unlock content or features based on achievements
+- **BuddyPress Integration**: Activity updates when users earn points or achievements
+- **Implementation Method**: WordPress plugin with database storage
+
+### Gamification Features
+
+Both implementations support these core features:
+
+- **Progress Tracking**: Visual indicators of tutorial completion progress
+- **Achievement Unlocks**: Special rewards for completing tutorial milestones
+- **Points System**: Accumulation of points for completed activities
+- **Visual Indicators**: Interface elements showing completion status
+- **Continuity**: Progress persists between sessions
+- **Tutorial Navigation**: "Continue to Next Tutorial" links for seamless progression
+
+### Implementation Details
+
+The environment automatically installs GamiPress and its BuddyPress integration for all development and production builds, providing a foundation for either implementation approach:
+
+- Simple implementation uses JavaScript and cookies for client-side tracking
+- GamiPress implementation uses WordPress database for server-side tracking
+- Both implementations can coexist to demonstrate different approaches
+- Default tutorial content works with both approaches out of the box
+
+This dual approach allows demonstration of both simple client-side gamification techniques and more complex plugin-based implementations.

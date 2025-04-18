@@ -35,23 +35,24 @@ fi
 
 # Load only domain and email from .env file to avoid issues with special characters
 log "Extracting domain and email from .env file"
-if [ -f .env ]; then
+ENV_FILE="../../.env"
+if [ -f "$ENV_FILE" ]; then
   # Use grep with safe pattern extraction to avoid issues with special characters
   # Extract domain from WP_SITE_URL or DOMAIN_NAME
-  WP_SITE_URL=$(grep -E "^WP_SITE_URL=" .env | cut -d= -f2 | tr -d '"' | tr -d "'")
+  WP_SITE_URL=$(grep -E "^WP_SITE_URL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
   if [ -n "$WP_SITE_URL" ]; then
     DOMAIN_NAME=$(echo "$WP_SITE_URL" | sed "s|https://||" | sed "s|http://||" | sed "s|/||g")
   else
-    DOMAIN_NAME=$(grep -E "^DOMAIN_NAME=" .env | cut -d= -f2 | tr -d '"' | tr -d "'")
+    DOMAIN_NAME=$(grep -E "^DOMAIN_NAME=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
   fi
 
   # Extract email from WP_ADMIN_EMAIL or CERTBOT_EMAIL
-  ADMIN_EMAIL=$(grep -E "^WP_ADMIN_EMAIL=" .env | cut -d= -f2 | tr -d '"' | tr -d "'")
+  ADMIN_EMAIL=$(grep -E "^WP_ADMIN_EMAIL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
   if [ -z "$ADMIN_EMAIL" ] || [ "$ADMIN_EMAIL" = "admin@example.com" ]; then
-    ADMIN_EMAIL=$(grep -E "^CERTBOT_EMAIL=" .env | cut -d= -f2 | tr -d '"' | tr -d "'")
+    ADMIN_EMAIL=$(grep -E "^CERTBOT_EMAIL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
   fi
 else
-  error_exit ".env file not found. Are you in the correct directory?"
+  error_exit ".env file not found at $ENV_FILE. Are you running from the correct directory?"
 fi
 
 # Validate domain and email
@@ -67,22 +68,23 @@ log "Setting up SSL for domain: $DOMAIN_NAME"
 log "Using email: $ADMIN_EMAIL"
 
 # Ensure the domain and email are set in .env
-sed -i "s|DOMAIN_NAME=.*|DOMAIN_NAME=$DOMAIN_NAME|" .env
-sed -i "s|CERTBOT_EMAIL=.*|CERTBOT_EMAIL=$ADMIN_EMAIL|" .env
+sed -i "s|DOMAIN_NAME=.*|DOMAIN_NAME=$DOMAIN_NAME|" "$ENV_FILE"
+sed -i "s|CERTBOT_EMAIL=.*|CERTBOT_EMAIL=$ADMIN_EMAIL|" "$ENV_FILE"
 
 # Create directories
-mkdir -p ./nginx/ssl/live/$DOMAIN_NAME
-mkdir -p ./nginx/conf
+NGINX_DIR="../../nginx"
+mkdir -p $NGINX_DIR/ssl/live/$DOMAIN_NAME
+mkdir -p $NGINX_DIR/conf
 
 # Generate temporary self-signed certificate
 echo "Generating temporary self-signed certificate for $DOMAIN_NAME..."
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout ./nginx/ssl/live/$DOMAIN_NAME/privkey.pem \
-  -out ./nginx/ssl/live/$DOMAIN_NAME/fullchain.pem \
+  -keyout $NGINX_DIR/ssl/live/$DOMAIN_NAME/privkey.pem \
+  -out $NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem \
   -subj "/CN=$DOMAIN_NAME/O=Example/C=US"
 
 # Create Nginx configuration
-cat > ./nginx/conf/default.conf << EOF
+cat > $NGINX_DIR/conf/default.conf << EOF
 # HTTP server for certificate validation
 server {
     listen 80;
