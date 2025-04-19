@@ -758,6 +758,29 @@ sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
 sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
 ```
 
+### Docker Permission Errors
+
+If you see `Error: kill EPERM` when running Docker commands:
+
+```bash
+# This error occurs when scripts running with sudo try to use sudo commands internally.
+# To fix this, always follow this pattern in your scripts:
+
+if [ "$(id -u)" -eq 0 ]; then
+  # Running as root (via sudo), use docker commands directly
+  docker-compose command
+else
+  # Not running as root, use sudo -E with docker commands
+  sudo -E docker-compose command
+fi
+```
+
+Important guidelines:
+- Always run scripts with sudo first: `sudo ./scripts/ssl/ssl-setup.sh`
+- Never add additional sudo commands inside scripts already run with sudo
+- Use sudo -E (not just sudo) when environment variables need to be preserved
+- Apply this pattern to ALL docker/docker-compose commands in scripts
+
 ### WordPress Setup Issues
 
 If WordPress setup fails:
