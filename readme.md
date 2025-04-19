@@ -2,6 +2,73 @@
 
 This repository provides a Docker-based WordPress development environment with BuddyPress installed, supporting both local development and production deployment.
 
+## Development Environment Setup
+
+### Node.js 22
+
+```bash
+# Create directory for user-local packages
+mkdir -p ~/.npm-global
+
+# Configure npm to use the new directory path
+npm config set prefix '~/.npm-global'
+
+# Add npm path to .bashrc
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+
+# Apply the changes without logging out and back in
+export PATH=~/.npm-global/bin:$PATH
+
+# Install Node.js 22 using nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+# Source nvm without closing the terminal
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Install Node.js 22
+nvm install 22
+
+# Verify installation
+node -v
+npm -v
+```
+
+### Claude Code CLI
+
+```bash
+# Install Claude Code (after Node.js is installed)
+npm install -g @anthropic-ai/claude-code
+
+# Create Claude Code config directory
+mkdir -p ~/.config/claude-code
+
+# Verify Claude Code installation
+which claude
+```
+
+### Verify Setup
+
+```bash
+# Check system and swap configuration
+uname -a
+free -h
+swapon --show
+
+# Check Docker installation
+docker --version
+systemctl status docker
+docker-compose --version
+
+# Check if Node.js is installed
+node -v
+npm -v
+which node
+
+# Check if Claude Code is installed
+which claude
+```
+
 ## Hardened Production Image
 
 The v0.1.1 release includes a security-hardened production image with:
@@ -89,13 +156,21 @@ cd wp-dev
 Generate and configure SSH keys for both GitHub repository access and remote development:
 
 ```bash
-# Generate SSH key (if you don't have one already)
-ssh-keygen -t ed25519 -C "your.email@example.com"
-eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519
+# Generate a new SSH key
+ssh-keygen -t ed25519 -C "your_email@example.com"
 
-# For GitHub repository access
-cat ~/.ssh/id_ed25519.pub  # Copy this to GitHub → Settings → SSH keys
-ssh -T git@github.com      # Verify connection
+# Start the SSH agent
+eval "$(ssh-agent -s)"
+
+# Add the key to the agent (skip passphrase by pressing enter)
+ssh-add ~/.ssh/id_ed25519
+
+# Display the public key (add this to your GitHub account)
+cat ~/.ssh/id_ed25519.pub
+
+# Test SSH connection to GitHub
+ssh -T git@github.com
+# You should see: "Hi username! You've successfully authenticated..."
 
 # For GCP VM remote development
 # Option A: Using ssh-copy-id
@@ -237,28 +312,46 @@ echo -n "your_new_token" | gcloud secrets versions add GITHUB_TOKEN --data-file=
 To properly authenticate and pull images, ALWAYS follow this exact sequence:
 
 ```bash
-# 1. Source secrets script to get token from Google Secret Manager
-source ./setup-secrets.sh
+# 1. Verify Secret Manager access (secrets should already exist)
+gcloud secrets list --project=scripthammer
 
-# 2. Login to GitHub Container Registry with the token
+# 2. Source secrets script to get token from Google Secret Manager
+source ./scripts/setup-secrets.sh
+
+# 3. Login to GitHub Container Registry with the token
 # CRITICAL: This step must be run EVERY TIME before pulling images
-# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
-# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
-echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
+sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
 
-# 3. Now you can pull images
+# 4. Pull the production image
 sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
+
+# 5. Start the database first, then other containers
+sudo -E docker-compose up -d db
+
+# 6. Wait for database to initialize (important for reliability)
+sleep 30  # Wait 30 seconds for database to fully initialize
+
+# 7. Start the remaining containers
+sudo -E docker-compose up -d wordpress-prod wp-prod-setup nginx certbot
+
+# 8. Set up SSL certificates
+# The SSL setup script automatically locates your .env file at the repository root.
+# For detailed logs or debugging, run with Bash debugging and tee:
+sudo bash -x scripts/ssl/ssl-setup.sh | tee ssl-setup-$(date +%Y%m%d-%H%M%S).log
+
+# 9. (Optional) Restart Nginx to apply certificates (the script restarts Nginx by default):
+sudo docker-compose restart nginx
 ```
 
 ⚠️ **IMPORTANT**: Skipping any of these steps will result in authentication errors!
 
 ### Production Server Deployment
 
-Deploy to production after GitHub Actions builds the image:
+Follow this exact sequence for a reliable production deployment:
 
 ```bash
 # First-time setup
-git clone https://github.com/TortoiseWolfe/wp-dev.git /var/www/wp-dev
+git clone git@github.com:TortoiseWolfe/wp-dev.git /var/www/wp-dev
 cd /var/www/wp-dev
 
 # OR update existing deployment
@@ -267,12 +360,42 @@ git fetch origin && git checkout main && git pull origin main
 # Configure environment
 cp .env.example .env && nano .env  # Edit with production values
 
-# Deploy the complete hardened production stack
-# IMPORTANT: You need to run these commands directly in your terminal, they won't work through Claude Code
-echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
-docker-compose up -d
-docker-compose ps  # Verify status
+# 1. Verify Secret Manager access (secrets should already exist)
+gcloud secrets list --project=scripthammer
+
+# 2. Source secrets script to get token from Google Secret Manager
+source ./scripts/setup-secrets.sh
+
+# 3. Login to GitHub Container Registry with the token
+sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN"
+
+# 4. Pull the production image
+sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
+
+# 5. Start the database first, then other containers
+sudo -E docker-compose up -d db
+
+# 6. Wait for database to initialize (important for reliability)
+echo "Waiting 30 seconds for database to initialize..."
+sleep 30
+
+# 7. Start the remaining containers
+sudo -E docker-compose up -d wordpress-prod wp-prod-setup nginx certbot
+
+# 8. Verify all containers are running
+sudo docker-compose ps
+
+# 9. Set up SSL certificates
+# The SSL setup script automatically locates your .env file at the repository root.
+# You can capture detailed logs for future reference:
+sudo bash -x scripts/ssl/ssl-setup.sh | tee ssl-setup-$(date +%Y%m%d-%H%M%S).log
+
+# 10. (Optional) Restart Nginx to apply certificates (the script restarts Nginx by default):
+sudo docker-compose restart nginx
+
+# 11. Verify installation
+sudo -E docker-compose exec wordpress-prod wp core is-installed --allow-root
+sudo -E docker-compose exec wordpress-prod wp plugin status buddypress --allow-root
 ```
 
 ### Automated Deployment Script (For Production Server)
@@ -611,18 +734,49 @@ git branch -d feature/your-feature-name
 
 ## Troubleshooting
 
+### Common Container Issues
+
 ```bash
 # Container issues
-docker-compose down -v && docker-compose up -d
+sudo docker-compose down -v && sudo docker-compose up -d
 
 # Database errors
-docker-compose logs db
+sudo docker-compose logs db
 
 # Docker permission denied
 sudo usermod -aG docker $USER && newgrp docker
 ```
+
+### GitHub Authentication Errors
+
+If you see `Error: Head: unauthorized` or similar:
+
+```bash
+# Always use this full sequence - order matters!
+source ./scripts/setup-secrets.sh
+sudo -E docker login ghcr.io -u tortoisewolfe --password "$GITHUB_TOKEN" 
+sudo -E docker pull ghcr.io/tortoisewolfe/wp-dev:v0.1.1
+```
+
+### WordPress Setup Issues
+
+If WordPress setup fails:
+
+```bash
+# Check logs
+sudo docker-compose logs wordpress-prod
+
+# Verify database connection
+sudo -E docker-compose exec wordpress-prod wp db check --allow-root
+
+# Manually trigger setup
+sudo -E docker-compose exec wordpress-prod /usr/local/bin/scripts/setup.sh
+```
+
+### Other Common Issues
 - **GitHub Registry access denied**: Authenticate with token from [GitHub Token section](#github-token-for-pulling-images)
 - **Docker installation issues**: Check logs at `/tmp/enhanced-boot.log`
+- **Installation always seems to fail**: Try starting database first, waiting 30 seconds, then starting other containers
 
 ## SSL Configuration
 
@@ -642,9 +796,18 @@ To set up SSL with Let's Encrypt for your WordPress site:
 
 3. **Certificate Generation:**
    ```bash
-   # Run the SSL setup script
-   sudo ./ssl-setup.sh
+   # From the project root, run the SSL setup script
+   sudo bash -x scripts/ssl/ssl-setup.sh | tee ssl-setup-$(date +%Y%m%d-%H%M%S).log
    ```
+
+   # Note:
+   # - The script auto-detects the .env file in the repository root.
+   # - Detailed logs are written to /tmp/ssl-setup-*.log by default.
+   # - If Let's Encrypt rate limits are reached, it will fall back to a self-signed certificate.
+   # - For repeated end-to-end testing without hitting production rate limits, you can enable staging mode:
+   #     export STAGING=1
+   #     sudo bash -x scripts/ssl/ssl-setup.sh | tee ssl-setup-staging-$(date +%Y%m%d-%H%M%S).log
+   #   These certs are signed by the Let's Encrypt staging CA and not trusted by browsers but allow full workflow testing.
 
    The script automatically:
    - Configures Nginx with HTTPS support
@@ -666,6 +829,7 @@ To set up SSL with Let's Encrypt for your WordPress site:
      - That your domain resolves to your server (dig yourdomain.com)
      - That ports 80/443 are accessible from the internet
      - Certbot logs: `sudo -E docker-compose logs certbot`
+
 
 ## Additional Resources
 

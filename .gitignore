@@ -36,3 +36,12 @@ nginx/ssl/*.key
 nginx/ssl/*.crt
 nginx/ssl/live/
 nginx/ssl/renewal-hooks/
+# Cert renewal configs - auto-generated, do not commit
+nginx/ssl/renewal/
+nginx/ssl/renewal/scripthammer.com-0002.conf
+nginx/ssl/accounts/
+nginx/ssl/archive/
+
+# Local logs and personal notes
+memory_log.txt
+scripts/ssl/codex_notes.md

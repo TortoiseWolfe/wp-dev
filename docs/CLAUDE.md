@@ -3,8 +3,48 @@
 ## ⚠️ ATTENTION CLAUDE: CHECK MEMORY LOG FIRST! ⚠️
 When starting a new session, IMMEDIATELY check `/memory_log.txt` first to restore context. DO NOT GIVE UP due to system load - the system can handle it despite high load and limited RAM. Follow the critical sequence in memory_log.txt completely.
 
+## ⚠️ CLAUDE CRASH RECOVERY PROCEDURE ⚠️
+If Claude crashes with "Error: kill EPERM" or similar errors:
+1. Check `memory_log.txt` to see what you were working on
+2. Continue from where you left off, following the "NEXT STEPS" section
+3. Update `memory_log.txt` with your current progress after making significant changes
+4. Document any errors encountered with their solutions
+
 ## ✅ ENVIRONMENT VARIABLE SOLUTION IMPLEMENTED ✅
 The issue with environment variables not being passed to containers has been fixed by modifying the setup-secrets.sh script to update the .env file with actual secret values. Docker Compose prioritizes .env file over shell environment variables, which was causing the issue.
+
+## ⚠️ DOCKER PERMISSIONS FIX ⚠️
+The "Error: kill EPERM" Docker permission error has been fixed in SSL setup script by implementing a consistent root-context detection pattern:
+
+### Root Cause of EPERM Errors
+The error occurred when scripts already running with sudo privileges internally tried to use sudo again. This created a "sudo within sudo" situation causing permission conflicts, resulting in "Error: kill EPERM" errors when Docker tried to manage containers.
+
+### Solution Implemented
+1. Running the script with sudo: `sudo ./scripts/ssl/ssl-setup.sh` (required)
+2. Inside the script, detecting root context with `if [ "$(id -u)" -eq 0 ]` checks before ALL docker commands
+3. Using appropriate command form based on context:
+   - Using `docker-compose` directly when running as root (prevents sudo inside sudo)
+   - Using `sudo -E docker-compose` when not running as root (ensures proper permissions)
+4. This pattern has been applied consistently to ALL docker/docker-compose commands in the script
+5. The same handling is applied to docker inspect and related commands
+
+### Pattern Example
+```bash
+# Example of the pattern used throughout the script
+if [ "$(id -u)" -eq 0 ]; then
+  # Running as root (via sudo), use docker commands directly
+  docker-compose command
+else
+  # Not running as root, use sudo -E with docker commands
+  sudo -E docker-compose command
+fi
+```
+
+### Important Usage Notes
+- The script MUST still be run with sudo: `sudo ./scripts/ssl/ssl-setup.sh`
+- Do NOT add additional sudo commands inside scripts already run with sudo
+- When adding new docker commands to any script, always use this pattern
+- Use sudo -E (not just sudo) when environment variables need to be preserved
 
 ## ✅ WP-CLI AUTOMATION OPTIMIZED ✅
 WP-CLI auto-installation now uses a streamlined approach:

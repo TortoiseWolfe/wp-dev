@@ -2,8 +2,15 @@
 # ssl-setup.sh - Script to automate SSL certificate setup for WordPress
 # For production environment on scripthammer.com
 
-# Don't stop immediately on errors, but track them
+# IMPORTANT: This script MUST be run with sudo: sudo ./scripts/ssl/ssl-setup.sh
+# ROOT PERMISSION HANDLING: Throughout this script, we check whether we're running as root
+# and adjust docker commands accordingly to prevent "Error: kill EPERM" permission issues.
+# PATTERN: if [ "$(id -u)" -eq 0 ]; then docker-compose ...; else sudo -E docker-compose ...; fi
+# Do NOT add/remove sudo commands without understanding this pattern!
+
+# Don't stop immediately on errors, but track them; also capture pipeline failures
 set +e
+set -o pipefail
 
 # Log file for this run
 LOG_FILE="/tmp/ssl-setup-$(date +%Y%m%d-%H%M%S).log"
@@ -29,30 +36,49 @@ error_exit() {
 }
 
 # Ensure we run with proper privileges
+# Ensure we run with proper privileges
 if [ "$(id -u)" -ne 0 ]; then
   error_exit "This script must be run as root (sudo)"
 fi
 
-# Load only domain and email from .env file to avoid issues with special characters
+# Load only domain and email from .env file
 log "Extracting domain and email from .env file"
-ENV_FILE="../../.env"
-if [ -f "$ENV_FILE" ]; then
-  # Use grep with safe pattern extraction to avoid issues with special characters
-  # Extract domain from WP_SITE_URL or DOMAIN_NAME
-  WP_SITE_URL=$(grep -E "^WP_SITE_URL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
-  if [ -n "$WP_SITE_URL" ]; then
-    DOMAIN_NAME=$(echo "$WP_SITE_URL" | sed "s|https://||" | sed "s|http://||" | sed "s|/||g")
-  else
-    DOMAIN_NAME=$(grep -E "^DOMAIN_NAME=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
-  fi
 
-  # Extract email from WP_ADMIN_EMAIL or CERTBOT_EMAIL
-  ADMIN_EMAIL=$(grep -E "^WP_ADMIN_EMAIL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
-  if [ -z "$ADMIN_EMAIL" ] || [ "$ADMIN_EMAIL" = "admin@example.com" ]; then
-    ADMIN_EMAIL=$(grep -E "^CERTBOT_EMAIL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
-  fi
+# Determine script and repository root to locate .env reliably
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if [ -f "$REPO_ROOT/.env" ]; then
+  ENV_FILE="$REPO_ROOT/.env"
+elif [ -f "/var/www/wp-dev/.env" ]; then
+  ENV_FILE="/var/www/wp-dev/.env"
 else
-  error_exit ".env file not found at $ENV_FILE. Are you running from the correct directory?"
+  error_exit "Could not locate .env file. Checked $REPO_ROOT/.env and /var/www/wp-dev/.env"
+fi
+log "Using .env file at $ENV_FILE"
+
+# STAGING MODE: if STAGING env var is set (1 or true), use Let's Encrypt staging server to avoid rate limits
+if [ "${STAGING}" = "1" ] || [ "${STAGING}" = "true" ]; then
+  STAGING_FLAG="--staging"
+  log "Certbot staging mode enabled (using Let's Encrypt staging environment)"
+  # In staging mode, allow replacing existing certs
+  BREAK_FLAG="--break-my-certs"
+else
+  STAGING_FLAG=""
+  BREAK_FLAG=""
+fi
+
+# Extract domain from WP_SITE_URL or DOMAIN_NAME
+WP_SITE_URL=$(grep -E "^WP_SITE_URL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
+if [ -n "$WP_SITE_URL" ]; then
+  DOMAIN_NAME=$(echo "$WP_SITE_URL" | sed "s|https://||" | sed "s|http://||" | sed "s|/||g")
+else
+  DOMAIN_NAME=$(grep -E "^DOMAIN_NAME=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
+fi
+
+# Extract email from WP_ADMIN_EMAIL or CERTBOT_EMAIL
+ADMIN_EMAIL=$(grep -E "^WP_ADMIN_EMAIL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
+if [ -z "$ADMIN_EMAIL" ] || [ "$ADMIN_EMAIL" = "admin@example.com" ]; then
+  ADMIN_EMAIL=$(grep -E "^CERTBOT_EMAIL=" "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'")
 fi
 
 # Validate domain and email
@@ -60,6 +86,12 @@ if [ -z "$DOMAIN_NAME" ]; then
   error_exit "Domain name is empty. Check your .env file for WP_SITE_URL or DOMAIN_NAME."
 fi
 
+# Prevent using placeholder email addresses
+if [[ "$ADMIN_EMAIL" =~ @example\.com$ ]]; then
+  error_exit "CERTBOT_EMAIL ('$ADMIN_EMAIL') appears to be a placeholder. Please set a valid email address in your .env file (CERTBOT_EMAIL) and re-run."
+fi
+
+# Validate domain and email
 if [ -z "$ADMIN_EMAIL" ]; then
   error_exit "Admin email is empty. Check your .env file for WP_ADMIN_EMAIL or CERTBOT_EMAIL."
 fi
@@ -71,10 +103,10 @@ log "Using email: $ADMIN_EMAIL"
 sed -i "s|DOMAIN_NAME=.*|DOMAIN_NAME=$DOMAIN_NAME|" "$ENV_FILE"
 sed -i "s|CERTBOT_EMAIL=.*|CERTBOT_EMAIL=$ADMIN_EMAIL|" "$ENV_FILE"
 
-# Create directories
-NGINX_DIR="../../nginx"
-mkdir -p $NGINX_DIR/ssl/live/$DOMAIN_NAME
-mkdir -p $NGINX_DIR/conf
+ # Create directories under the repo root
+ NGINX_DIR="$REPO_ROOT/nginx"
+mkdir -p "$NGINX_DIR/ssl/live/$DOMAIN_NAME"
+mkdir -p "$NGINX_DIR/conf"
 
 # Generate temporary self-signed certificate
 echo "Generating temporary self-signed certificate for $DOMAIN_NAME..."
@@ -83,8 +115,54 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -out $NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem \
   -subj "/CN=$DOMAIN_NAME/O=Example/C=US"
 
-# Create Nginx configuration
-cat > $NGINX_DIR/conf/default.conf << EOF
+# Check if we should update Nginx configuration
+NGINX_CONF="$NGINX_DIR/conf/default.conf"
+SHOULD_UPDATE_CONF=0
+
+# Determine if we need to update the configuration
+if [ ! -f "$NGINX_CONF" ]; then
+    log "Nginx configuration file doesn't exist. Creating it."
+    SHOULD_UPDATE_CONF=1
+else
+    # Check if domain in config matches current domain
+    DOMAIN_IN_CONFIG=$(grep -o "server_name [^;]*;" "$NGINX_CONF" | head -1 | sed 's/server_name //g' | sed 's/www\.//g' | sed 's/ .*//g' | sed 's/;//g')
+    
+    if [ "$DOMAIN_IN_CONFIG" != "$DOMAIN_NAME" ]; then
+        log "Domain in config ($DOMAIN_IN_CONFIG) doesn't match current domain ($DOMAIN_NAME). Updating."
+        SHOULD_UPDATE_CONF=1
+    else
+        # Check if the certificate is self-signed
+        if [ -f "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" ]; then
+            ISSUER=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -issuer -noout | sed 's/^issuer=//')
+            SUBJECT=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -subject -noout | sed 's/^subject=//')
+            
+            if [ "$ISSUER" = "$SUBJECT" ]; then
+                log "Using self-signed certificate. Will try to obtain Let's Encrypt certificate."
+            else
+                log "Using valid CA-issued certificate. No need to update configuration."
+                # Check certificate expiration
+                EXPIRY_DATE=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -enddate -noout | cut -d= -f2)
+                EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s)
+                CURRENT_EPOCH=$(date +%s)
+                DAYS_LEFT=$(( ($EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
+                
+                log "Certificate expires in $DAYS_LEFT days."
+                if [ $DAYS_LEFT -lt 30 ]; then
+                    log "Certificate expires soon. Will attempt renewal."
+                    # We'll try renewal but don't need to update config
+                fi
+            fi
+        else
+            log "SSL certificates not found. Generating new configuration."
+            SHOULD_UPDATE_CONF=1
+        fi
+    fi
+fi
+
+# Create Nginx configuration if needed
+if [ $SHOULD_UPDATE_CONF -eq 1 ]; then
+    log "Creating new Nginx configuration for $DOMAIN_NAME"
+    cat > $NGINX_DIR/conf/default.conf << EOF
 # HTTP server for certificate validation
 server {
     listen 80;
@@ -166,11 +244,21 @@ server {
     }
 }
 EOF
+    log "Nginx configuration created."
+else
+    log "Keeping existing Nginx configuration."
+fi
 
 # Stop and restart containers
 log "Restarting containers to apply SSL configuration..."
-sudo -E docker-compose down
-sudo -E docker-compose up -d
+# Use docker-compose directly when running as root, otherwise use sudo
+if [ "$(id -u)" -eq 0 ]; then
+  docker-compose down
+  docker-compose up -d
+else
+  sudo -E docker-compose down
+  sudo -E docker-compose up -d
+fi
 
 # Wait for Nginx to start
 log "Waiting for Nginx to start..."
@@ -181,9 +269,17 @@ ATTEMPT=0
 # Check if Nginx is running with retry
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   ATTEMPT=$((ATTEMPT+1))
-  nginx_container=$(sudo -E docker-compose ps -q nginx)
+  if [ "$(id -u)" -eq 0 ]; then
+    nginx_container=$(docker-compose ps -q nginx)
+  else
+    nginx_container=$(sudo -E docker-compose ps -q nginx)
+  fi
   if [ -n "$nginx_container" ]; then
-    nginx_status=$(sudo docker inspect --format='{{.State.Status}}' $nginx_container)
+    if [ "$(id -u)" -eq 0 ]; then
+      nginx_status=$(docker inspect --format='{{.State.Status}}' $nginx_container)
+    else
+      nginx_status=$(sudo docker inspect --format='{{.State.Status}}' $nginx_container)
+    fi
     if [ "$nginx_status" = "running" ]; then
       log "Nginx container is running (attempt $ATTEMPT/$MAX_ATTEMPTS)"
       break
@@ -197,7 +293,11 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
     log_error "Nginx container failed to start after $MAX_ATTEMPTS attempts"
     log "Dumping container logs:"
-    sudo -E docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
+    if [ "$(id -u)" -eq 0 ]; then
+      docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
+    else
+      sudo -E docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
+    fi
     error_exit "Nginx container failed to start. Check the logs for details."
   fi
   
@@ -208,9 +308,17 @@ done
 ATTEMPT=0
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   ATTEMPT=$((ATTEMPT+1))
-  certbot_container=$(sudo -E docker-compose ps -q certbot)
+  if [ "$(id -u)" -eq 0 ]; then
+    certbot_container=$(docker-compose ps -q certbot)
+  else
+    certbot_container=$(sudo -E docker-compose ps -q certbot)
+  fi
   if [ -n "$certbot_container" ]; then
-    certbot_status=$(sudo docker inspect --format='{{.State.Status}}' $certbot_container)
+    if [ "$(id -u)" -eq 0 ]; then
+      certbot_status=$(docker inspect --format='{{.State.Status}}' $certbot_container)
+    else
+      certbot_status=$(sudo docker inspect --format='{{.State.Status}}' $certbot_container)
+    fi
     if [ "$certbot_status" = "running" ]; then
       log "Certbot container is running (attempt $ATTEMPT/$MAX_ATTEMPTS)"
       break
@@ -224,7 +332,11 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
     log_error "Certbot container failed to start after $MAX_ATTEMPTS attempts"
     log "Dumping container logs:"
-    sudo -E docker-compose logs --tail=100 certbot >> $LOG_FILE 2>&1
+    if [ "$(id -u)" -eq 0 ]; then
+      docker-compose logs --tail=100 certbot >> $LOG_FILE 2>&1
+    else
+      sudo -E docker-compose logs --tail=100 certbot >> $LOG_FILE 2>&1
+    fi
     error_exit "Certbot container failed to start. Check the logs for details."
   fi
   
@@ -255,18 +367,71 @@ else
 fi
 
 # Request real Let's Encrypt certificate
-log "Requesting Let's Encrypt certificates for $DOMAIN_NAME..."
-log "This may take a minute or two..."
-sudo -E docker-compose exec -T certbot certbot certonly \
-  --webroot \
-  --webroot-path=/var/www/certbot \
-  --email "$ADMIN_EMAIL" \
-  --agree-tos \
-  --no-eff-email \
-  --force-renewal \
-  -d "$DOMAIN_NAME" \
-  -d "www.$DOMAIN_NAME" \
-  2>&1 | tee -a $LOG_FILE
+log "Checking if we should request Let's Encrypt certificates for $DOMAIN_NAME..."
+
+# Check if we should request a new certificate
+SHOULD_REQUEST_CERT=0
+
+# Check if the certificate exists and is self-signed
+if [ -f "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" ]; then
+    ISSUER=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -issuer -noout | sed 's/^issuer=//')
+    SUBJECT=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -subject -noout | sed 's/^subject=//')
+    
+    if [ "$ISSUER" = "$SUBJECT" ]; then
+        log "Current certificate is self-signed. Will request Let's Encrypt certificate."
+        SHOULD_REQUEST_CERT=1
+    else
+        # Check expiration time
+        EXPIRY_DATE=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -enddate -noout | cut -d= -f2)
+        EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s)
+        CURRENT_EPOCH=$(date +%s)
+        DAYS_LEFT=$(( ($EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
+        
+        log "Certificate expires in $DAYS_LEFT days."
+        if [ $DAYS_LEFT -lt 30 ]; then
+            log "Certificate expires in less than 30 days. Will attempt renewal."
+            SHOULD_REQUEST_CERT=1
+        else
+            log "Certificate is valid and not expiring soon. Skipping certificate request."
+        fi
+    fi
+else
+    log "No certificate found. Will request Let's Encrypt certificate."
+    SHOULD_REQUEST_CERT=1
+fi
+
+if [ $SHOULD_REQUEST_CERT -eq 1 ]; then
+    log "Requesting Let's Encrypt certificates for $DOMAIN_NAME..."
+    log "This may take a minute or two..."
+    # Use non-interactive mode for automated certificate issuance
+    if [ "$(id -u)" -eq 0 ]; then
+      docker-compose exec -T certbot certbot certonly $STAGING_FLAG $BREAK_FLAG \
+      --non-interactive \
+      --webroot \
+      --webroot-path=/var/www/certbot \
+      --email "$ADMIN_EMAIL" \
+      --agree-tos \
+      --no-eff-email \
+      --force-renewal \
+      -d "$DOMAIN_NAME" \
+      -d "www.$DOMAIN_NAME" \
+      2>&1 | tee -a $LOG_FILE
+    else
+      sudo -E docker-compose exec -T certbot certbot certonly $STAGING_FLAG $BREAK_FLAG \
+      --non-interactive \
+      --webroot \
+      --webroot-path=/var/www/certbot \
+      --email "$ADMIN_EMAIL" \
+      --agree-tos \
+      --no-eff-email \
+      --force-renewal \
+      -d "$DOMAIN_NAME" \
+      -d "www.$DOMAIN_NAME" \
+      2>&1 | tee -a $LOG_FILE
+    fi
+else
+    log "Skipping Let's Encrypt certificate request."
+fi
 
 # Check if certificate was obtained
 CERT_RESULT=$?
@@ -285,7 +450,7 @@ if [ $CERT_RESULT -ne 0 ]; then
   fi
   
   log "Manual certificate issuance command for troubleshooting:"
-  log "sudo -E docker-compose exec certbot certbot certonly --webroot --webroot-path=/var/www/certbot --email $ADMIN_EMAIL --agree-tos --no-eff-email --force-renewal -d $DOMAIN_NAME -d www.$DOMAIN_NAME"
+  log "sudo -E docker-compose exec certbot certbot certonly $STAGING_FLAG $BREAK_FLAG --webroot --webroot-path=/var/www/certbot --email $ADMIN_EMAIL --agree-tos --no-eff-email --force-renewal -d $DOMAIN_NAME -d www.$DOMAIN_NAME"
   
   # Check if we can use self-signed instead for now
   log "Using self-signed certificates for now until domain verification issues are resolved"
@@ -295,21 +460,42 @@ fi
 
 # Restart Nginx to apply new certificates
 log "Restarting Nginx to apply Let's Encrypt certificates..."
-sudo -E docker-compose restart nginx
-if [ $? -ne 0 ]; then
-  log_error "Failed to restart Nginx"
-  log "Dumping Nginx logs:"
-  sudo -E docker-compose logs --tail=50 nginx >> $LOG_FILE 2>&1
+if [ "$(id -u)" -eq 0 ]; then
+  docker-compose restart nginx
+  RESTART_RESULT=$?
+  if [ $RESTART_RESULT -ne 0 ]; then
+    log_error "Failed to restart Nginx"
+    log "Dumping Nginx logs:"
+    docker-compose logs --tail=50 nginx >> $LOG_FILE 2>&1
+  else
+    log "Nginx restarted successfully"
+  fi
 else
-  log "Nginx restarted successfully"
+  sudo -E docker-compose restart nginx
+  RESTART_RESULT=$?
+  if [ $RESTART_RESULT -ne 0 ]; then
+    log_error "Failed to restart Nginx"
+    log "Dumping Nginx logs:"
+    sudo -E docker-compose logs --tail=50 nginx >> $LOG_FILE 2>&1
+  else
+    log "Nginx restarted successfully"
+  fi
 fi
 
 # Check if Nginx config is valid
-sudo -E docker-compose exec -T nginx nginx -t 2>&1 | tee -a $LOG_FILE
+if [ "$(id -u)" -eq 0 ]; then
+  docker-compose exec -T nginx nginx -t 2>&1 | tee -a $LOG_FILE
+else
+  sudo -E docker-compose exec -T nginx nginx -t 2>&1 | tee -a $LOG_FILE
+fi
 if [ ${PIPESTATUS[0]} -ne 0 ]; then
   log_error "Nginx configuration test failed"
   log "Dumping Nginx configuration:"
-  sudo -E docker-compose exec -T nginx nginx -T >> $LOG_FILE 2>&1
+  if [ "$(id -u)" -eq 0 ]; then
+    docker-compose exec -T nginx nginx -T >> $LOG_FILE 2>&1
+  else
+    sudo -E docker-compose exec -T nginx nginx -T >> $LOG_FILE 2>&1
+  fi
 else
   log "Nginx configuration is valid"
 fi
@@ -329,19 +515,23 @@ fi
 
 # List certificates for verification
 log "Listing installed certificates:"
-sudo -E docker-compose exec -T certbot certbot certificates 2>&1 | tee -a $LOG_FILE
+if [ "$(id -u)" -eq 0 ]; then
+  docker-compose exec -T certbot certbot certificates 2>&1 | tee -a $LOG_FILE
+else
+  sudo -E docker-compose exec -T certbot certbot certificates 2>&1 | tee -a $LOG_FILE
+fi
 
 log "SSL setup complete for $DOMAIN_NAME!"
 log "Your site should now be accessible at: https://$DOMAIN_NAME"
-log "You can verify certificate status with: sudo -E docker-compose exec certbot certbot certificates"
+log "You can verify certificate status with: docker-compose exec certbot certbot certificates"
 log "Certificates will be automatically renewed by the certbot container."
 log "If you encounter SSL issues, check the log file at: $LOG_FILE"
 
 # Summary of commands for troubleshooting
 log "=== Troubleshooting commands ==="
-log "Check certificate status: sudo -E docker-compose exec certbot certbot certificates"
-log "Test Nginx config: sudo -E docker-compose exec nginx nginx -t"
-log "View Nginx config: sudo -E docker-compose exec nginx nginx -T"
-log "Check SSL certificates: sudo ls -la $(pwd)/nginx/ssl/live/$DOMAIN_NAME/"
+log "Check certificate status: docker-compose exec certbot certbot certificates"
+log "Test Nginx config: docker-compose exec nginx nginx -t"
+log "View Nginx config: docker-compose exec nginx nginx -T"
+log "Check SSL certificates: ls -la $(pwd)/nginx/ssl/live/$DOMAIN_NAME/"
 log "Verify HTTP access: curl -sI http://$DOMAIN_NAME/.well-known/acme-challenge/test"
-log "Force Nginx reload: sudo -E docker-compose exec nginx nginx -s reload"
+log "Force Nginx reload: docker-compose exec nginx nginx -s reload"

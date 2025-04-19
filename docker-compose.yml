@@ -15,55 +15,7 @@ services:
     networks:
       - wordpress_network
 
-  # Development environment
-  wordpress:
-    build:
-      context: .
-      target: development
-    image: mywordpress:dev
-    depends_on:
-      - db
-    ports:
-      - "8000:80"
-    environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      # Pass site URL to WordPress
-      WORDPRESS_CONFIG_EXTRA: |
-        define('WP_HOME', '${WP_SITE_URL}');
-        define('WP_SITEURL', '${WP_SITE_URL}');
-    volumes:
-      - wp_data:/var/www/html
-    restart: always
-    networks:
-      - wordpress_network
-
-  # Development setup
-  wp-setup:
-    image: mywordpress:dev
-    depends_on:
-      - wordpress
-    environment:
-      WP_SITE_URL: ${WP_SITE_URL}
-      WP_SITE_TITLE: ${WP_SITE_TITLE}
-      WP_ADMIN_USER: ${WP_ADMIN_USER}
-      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
-      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT}
-    volumes:
-      - wp_data:/var/www/html
-    # Run setup and conditionally run demo-content
-    command: >
-      bash -c "/usr/local/bin/scripts/setup.sh"
-    restart: "no"
-    networks:
-      - wordpress_network
+  # Development environment services are disabled in this production deployment
 
   # Production environment
   wordpress-prod:
@@ -143,7 +95,7 @@ services:
 
   # Certbot for SSL certificate generation and renewal
   certbot:
-    image: certbot/certbot:latest
+    image: certbot/certbot:v2.6.0  # pinned specific version instead of 'latest'
     volumes:
       - certbot_data:/var/www/certbot
       - ./nginx/ssl:/etc/letsencrypt
