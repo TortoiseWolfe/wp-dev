@@ -118,8 +118,13 @@ chmod 600 ~/.ssh/config
 ```
 
 ```bash
-# Copy example environment variables
-cp .env.example .env
+# Copy example environment variables (only if .env does not already exist)
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo ".env file created from .env.example"
+else
+  echo ".env already exists; skipping copy. Please backup and update it manually if needed."
+fi
 
 # For local development (without Google Secret Manager)
 source ./scripts/dev/setup-local-dev.sh

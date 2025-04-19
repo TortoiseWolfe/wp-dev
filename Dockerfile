@@ -15,7 +15,7 @@ USER root
 
 # Install only the minimal required packages
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget unzip && \
+    apt-get install -y --no-install-recommends wget unzip default-mysql-client && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 
@@ -49,6 +49,8 @@ COPY devscripts/ally-content /usr/local/bin/devscripts/ally-content
 COPY devscripts/simple-gamification.css /usr/local/bin/devscripts/simple-gamification.css
 COPY devscripts/simple-gamification.js /usr/local/bin/devscripts/simple-gamification.js
 COPY devscripts/simple-gamification.php /usr/local/bin/devscripts/simple-gamification.php
+COPY devscripts/demo-content.sh /usr/local/bin/devscripts/demo-content.sh
+RUN chmod +x /usr/local/bin/devscripts/demo-content.sh
 
 # Set proper ownership for WordPress files
 RUN chown -R www-data:www-data /var/www/html /usr/src/wordpress
