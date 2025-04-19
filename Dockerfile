@@ -13,7 +13,7 @@ LABEL version="1.1"
 # Run as root for setup
 USER root
 
-# Install only the minimal required packages
+# Install required packages including mysql-client for database connectivity
 RUN apt-get update && \
     apt-get install -y --no-install-recommends wget unzip default-mysql-client && \
     rm -rf /var/lib/apt/lists/* && \
@@ -44,7 +44,7 @@ RUN mkdir -p /usr/src/wordpress/wp-content/plugins /usr/src/wordpress/wp-content
 COPY scripts/ /usr/local/bin/scripts/
 RUN chmod +x /usr/local/bin/scripts/*.sh /usr/local/bin/scripts/*/*.sh
 
-# Copy only production scripts from devscripts
+# Copy production scripts from devscripts
 COPY devscripts/ally-content /usr/local/bin/devscripts/ally-content
 COPY devscripts/simple-gamification.css /usr/local/bin/devscripts/simple-gamification.css
 COPY devscripts/simple-gamification.js /usr/local/bin/devscripts/simple-gamification.js

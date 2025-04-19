@@ -15,61 +15,10 @@ services:
     networks:
       - wordpress_network
 
-  # Development environment
-  wordpress:
-    build:
-      context: .
-      target: development
-    image: mywordpress:dev
-    depends_on:
-      - db
-    ports:
-      - "8000:80"
-    environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      # Pass site URL to WordPress
-      WORDPRESS_CONFIG_EXTRA: |
-        define('WP_HOME', '${WP_SITE_URL}');
-        define('WP_SITEURL', '${WP_SITE_URL}');
-    volumes:
-      - wp_data:/var/www/html
-    restart: always
-    networks:
-      - wordpress_network
-
-  # Development setup
-  wp-setup:
-    image: mywordpress:dev
-    depends_on:
-      - wordpress
-    environment:
-      WP_SITE_URL: ${WP_SITE_URL}
-      WP_SITE_TITLE: ${WP_SITE_TITLE}
-      WP_ADMIN_USER: ${WP_ADMIN_USER}
-      WP_ADMIN_PASSWORD: ${WP_ADMIN_PASSWORD}
-      WP_ADMIN_EMAIL: ${WP_ADMIN_EMAIL}
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT}
-    volumes:
-      - wp_data:/var/www/html
-    # Run setup and conditionally run demo-content
-    command: >
-      bash -c "/usr/local/bin/scripts/setup.sh"
-    restart: "no"
-    networks:
-      - wordpress_network
+  # Development environment services are disabled in this production deployment
 
   # Production environment
   wordpress-prod:
-    build:
-      context: .
-      target: production
     image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
     depends_on:
       - db
@@ -104,6 +53,7 @@ services:
   wp-prod-setup:
     image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
     depends_on:
+      - db
       - wordpress-prod
     environment:
       WP_SITE_URL: ${WP_SITE_URL}
@@ -115,16 +65,39 @@ services:
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT:-true}
+      SKIP_DEMO_CONTENT: ${SKIP_DEMO_CONTENT:-false}
     volumes:
       - wp_prod_data:/var/www/html
+      # Also mount the local devscripts to ensure latest versions are used
+      - ./devscripts:/usr/local/bin/devscripts
     command: >
-      bash -c "sleep 45 &&
-              wp core install --url=${WP_SITE_URL} --title=\"${WP_SITE_TITLE}\" --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${WP_ADMIN_EMAIL} --path=/var/www/html --skip-email --allow-root &&
+      bash -c "
+              # Wait for database to be ready
+              echo 'Waiting for database connection...' &&
+              until mysql -h db -u${WORDPRESS_DB_USER} -p${WORDPRESS_DB_PASSWORD} -e 'SELECT 1' ${WORDPRESS_DB_NAME}; do
+                echo 'Database connection not ready - waiting...'
+                sleep 5
+              done &&
+              
+              # Set up WordPress if needed
+              if ! wp core is-installed --path=/var/www/html --allow-root; then
+                echo 'Installing WordPress...' &&
+                wp core install --url=${WP_SITE_URL} --title=\"${WP_SITE_TITLE}\" --admin_user=${WP_ADMIN_USER} --admin_password=${WP_ADMIN_PASSWORD} --admin_email=${WP_ADMIN_EMAIL} --path=/var/www/html --skip-email --allow-root
+              else
+                echo 'WordPress already installed'
+              fi &&
+              
+              # Ensure correct site URLs
               wp option update siteurl ${WP_SITE_URL} --allow-root &&
               wp option update home ${WP_SITE_URL} --allow-root &&
-              /usr/local/bin/scripts/setup.sh"
-    restart: "no"
+              
+              # Make custom scripts executable
+              chmod +x /usr/local/bin/devscripts/demo-content.sh &&
+              
+              # Run the main setup script
+              /usr/local/bin/scripts/setup.sh
+              "
+    restart: "on-failure"
     networks:
       - wordpress_network
 
@@ -146,7 +119,7 @@ services:
 
   # Certbot for SSL certificate generation and renewal
   certbot:
-    image: certbot/certbot:latest
+    image: certbot/certbot:v2.6.0  # pinned specific version instead of 'latest'
     volumes:
       - certbot_data:/var/www/certbot
       - ./nginx/ssl:/etc/letsencrypt
