@@ -6,9 +6,29 @@ A Docker-based WordPress environment with BuddyPress for development and product
 
 - Docker & Docker Compose
 - Git
-- Node.js (via nvm)
+- Node.js v22 (via nvm)
 - npm
 - (Optional) Google Cloud SDK (for secrets)
+  
+### Node.js v22 Installation
+
+We recommend using nvm to install Node.js v22:
+
+```bash
+# Install or update nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+# Load nvm in current session
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Install Node.js v22 and set as default
+nvm install 22
+nvm alias default 22
+
+# Verify installation
+node -v
+npm -v
+```
 
 ## Local Development
 
