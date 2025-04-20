@@ -26,19 +26,14 @@ RUN wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.ph
     wp --info
 
 # Download and extract BuddyPress plugin, BuddyX theme, and GamiPress
-RUN mkdir -p /usr/src/wordpress/wp-content/plugins /usr/src/wordpress/wp-content/themes && \
+RUN mkdir -p /var/www/html/wp-content/plugins /var/www/html/wp-content/themes && \
     wget https://downloads.wordpress.org/plugin/buddypress.latest-stable.zip -O buddypress.zip && \
-    unzip buddypress.zip -d /usr/src/wordpress/wp-content/plugins && \
-    rm buddypress.zip && \
+    unzip buddypress.zip -d /var/www/html/wp-content/plugins && rm buddypress.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress.latest-stable.zip -O gamipress.zip && \
-    unzip gamipress.zip -d /usr/src/wordpress/wp-content/plugins && \
-    rm gamipress.zip && \
+    unzip gamipress.zip -d /var/www/html/wp-content/plugins && rm gamipress.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
-    unzip gamipress-bp.zip -d /usr/src/wordpress/wp-content/plugins && \
-    rm gamipress-bp.zip && \
+    unzip gamipress-bp.zip -d /var/www/html/wp-content/plugins && rm gamipress-bp.zip && \
     wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
-    unzip buddyx.zip -d /usr/src/wordpress/wp-content/themes && \
-    rm buddyx.zip
 
 # Copy scripts
 COPY scripts/ /usr/local/bin/scripts/
@@ -65,14 +60,8 @@ RUN \
     find /var/www/html -type d -exec chmod 755 {} \; && \
     find /var/www/html -type f -exec chmod 644 {} \;
 
-# Configure Apache
-COPY <<'EOT' /etc/apache2/conf-available/security.conf
-ServerTokens Prod
-ServerSignature Off
-TraceEnable Off
-EOT
-
-RUN a2enconf security
+# Configure Apache security settings
+RUN printf 'ServerTokens ProductOnly\nServerSignature Off\nTraceEnable Off\n' > /etc/apache2/conf-available/security.conf && a2enconf security
 
 # Switch to non-root user for runtime
 USER www-data

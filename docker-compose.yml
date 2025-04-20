@@ -19,7 +19,10 @@ services:
 
   # Production environment
   wordpress-prod:
-    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
+    build:
+      context: .
+      target: production
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.2
     depends_on:
       - db
     expose:
@@ -41,6 +44,7 @@ services:
         define('WP_SITEURL', 'https://${DOMAIN_NAME}');
     volumes:
       - wp_prod_data:/var/www/html
+      - ./scripts/apache/security.conf:/etc/apache2/conf-enabled/security.conf:ro
     restart: always
     healthcheck:
       test: ["CMD", "wp", "core", "is-installed", "--allow-root"]
@@ -51,7 +55,10 @@ services:
       - wordpress_network
     
   wp-prod-setup:
-    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
+    build:
+      context: .
+      target: production
+    image: ghcr.io/tortoisewolfe/wp-dev:v0.1.2
     depends_on:
       - db
       - wordpress-prod
@@ -74,7 +81,13 @@ services:
       bash -c "
               # Wait for database to be ready
               echo 'Waiting for database connection...' &&
-              until mysql -h db -u${WORDPRESS_DB_USER} -p${WORDPRESS_DB_PASSWORD} -e 'SELECT 1' ${WORDPRESS_DB_NAME}; do
+              # Use a file flag to prevent infinite restart loop
+              if [ -f /var/www/html/.setup_complete ]; then
+                echo 'Setup already completed, skipping...'
+                exit 0
+              fi &&
+              # Use wp-cli instead of mysql client for compatibility
+              until wp core version --path=/var/www/html --allow-root; do
                 echo 'Database connection not ready - waiting...'
                 sleep 5
               done &&
@@ -91,11 +104,11 @@ services:
               wp option update siteurl ${WP_SITE_URL} --allow-root &&
               wp option update home ${WP_SITE_URL} --allow-root &&
               
-              # Make custom scripts executable
-              chmod +x /usr/local/bin/devscripts/demo-content.sh &&
+              # Make custom scripts executable (ignore errors)
+              chmod +x /usr/local/bin/devscripts/demo-content.sh || true &&
               
               # Run the main setup script
-              /usr/local/bin/scripts/setup.sh
+              /usr/local/bin/scripts/setup.sh && touch /var/www/html/.setup_complete && echo 'Setup complete flag created.'
               "
     restart: "on-failure"
     networks:

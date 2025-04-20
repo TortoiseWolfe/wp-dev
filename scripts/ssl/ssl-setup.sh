@@ -2,11 +2,13 @@
 # ssl-setup.sh - Script to automate SSL certificate setup for WordPress
 # For production environment on scripthammer.com
 
-# IMPORTANT: This script MUST be run with sudo: sudo ./scripts/ssl/ssl-setup.sh
+# IMPORTANT: This script MUST be run with sudo: sudo ./scripts/ssl/ssl-setup.sh [--staging]
 # ROOT PERMISSION HANDLING: Throughout this script, we check whether we're running as root
 # and adjust docker commands accordingly to prevent "Error: kill EPERM" permission issues.
 # PATTERN: if [ "$(id -u)" -eq 0 ]; then docker-compose ...; else sudo -E docker-compose ...; fi
 # Do NOT add/remove sudo commands without understanding this pattern!
+# Optional flags:
+#   --staging    Use Let's Encrypt staging environment (avoids production rate limits)
 
 # Don't stop immediately on errors, but track them; also capture pipeline failures
 set +e
@@ -16,6 +18,18 @@ set -o pipefail
 LOG_FILE="/tmp/ssl-setup-$(date +%Y%m%d-%H%M%S).log"
 echo "Starting SSL setup at $(date)" | tee $LOG_FILE
 echo "All logs will be saved to $LOG_FILE" | tee -a $LOG_FILE
+ 
+# Parse command-line flags
+while (( "$#" )); do
+  case "$1" in
+    --staging)
+      STAGING="1"
+      ;;
+    *)
+      ;;
+  esac
+  shift
+done
 
 # Function to log messages
 log() {
@@ -86,9 +100,16 @@ if [ -z "$DOMAIN_NAME" ]; then
   error_exit "Domain name is empty. Check your .env file for WP_SITE_URL or DOMAIN_NAME."
 fi
 
-# Prevent using placeholder email addresses
+# Handle placeholder WP_ADMIN_EMAIL by falling back to CERTBOT_EMAIL if available
 if [[ "$ADMIN_EMAIL" =~ @example\.com$ ]]; then
-  error_exit "CERTBOT_EMAIL ('$ADMIN_EMAIL') appears to be a placeholder. Please set a valid email address in your .env file (CERTBOT_EMAIL) and re-run."
+  log "WARNING: WP_ADMIN_EMAIL ('$ADMIN_EMAIL') appears to be a placeholder. Checking CERTBOT_EMAIL..."
+  alt_email=$(grep -E '^CERTBOT_EMAIL=' "$ENV_FILE" | cut -d= -f2 | tr -d '"' | tr -d "'" )
+  if [ -n "$alt_email" ] && ! [[ "$alt_email" =~ @example\.com$ ]]; then
+    log "Using CERTBOT_EMAIL: $alt_email"
+    ADMIN_EMAIL="$alt_email"
+  else
+    error_exit "CERTBOT_EMAIL ('$alt_email') appears to be a placeholder. Please set a valid email in your .env file and re-run."
+  fi
 fi
 
 # Validate domain and email
@@ -380,6 +401,9 @@ if [ -f "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" ]; then
     if [ "$ISSUER" = "$SUBJECT" ]; then
         log "Current certificate is self-signed. Will request Let's Encrypt certificate."
         SHOULD_REQUEST_CERT=1
+    elif echo "$ISSUER" | grep -q "(STAGING)"; then
+        log "Current certificate is a staging certificate. Forcing production issuance."
+        SHOULD_REQUEST_CERT=1
     else
         # Check expiration time
         EXPIRY_DATE=$(openssl x509 -in "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem" -enddate -noout | cut -d= -f2)
@@ -456,7 +480,14 @@ if [ $CERT_RESULT -ne 0 ]; then
   log "Using self-signed certificates for now until domain verification issues are resolved"
 else
   log "Certificate successfully obtained!"
+# End of certificate issuance block
 fi
+
+# Update Nginx SSL directory with new certificates
+log "Updating Nginx SSL directory with new certificates..."
+LATEST_CERT_DIR=$(ls -1d "$NGINX_DIR/ssl/live/${DOMAIN_NAME}"* | sort | tail -n1)
+cp -L "$LATEST_CERT_DIR/fullchain.pem" "$NGINX_DIR/ssl/live/$DOMAIN_NAME/fullchain.pem"
+cp -L "$LATEST_CERT_DIR/privkey.pem" "$NGINX_DIR/ssl/live/$DOMAIN_NAME/privkey.pem"
 
 # Restart Nginx to apply new certificates
 log "Restarting Nginx to apply Let's Encrypt certificates..."
@@ -500,17 +531,44 @@ else
   log "Nginx configuration is valid"
 fi
 
-# Verify certificate is accessible
-log "Verifying HTTPS access..."
-curl -sILk https://$DOMAIN_NAME > /tmp/https_test.log 2>&1
-if [ $? -ne 0 ]; then
-  log_error "HTTPS connection failed"
-  cat /tmp/https_test.log >> $LOG_FILE
-  log_error "This may be due to network issues or firewall settings"
+# Verify certificate is accessible with retry support
+log "Verifying HTTPS access to https://${DOMAIN_NAME}..."
+HTTPS_TEST_LOG="/tmp/https_test.log"
+curl -sILk https://${DOMAIN_NAME} > "$HTTPS_TEST_LOG" 2>&1
+# Extract last HTTP status code
+https_status=$(grep "HTTP/" "$HTTPS_TEST_LOG" | tail -1 | awk '{print $2}')
+if [[ ! "$https_status" =~ ^2[0-9]{2}$ ]]; then
+  log_error "Initial HTTPS request returned status: $https_status"
+  cat "$HTTPS_TEST_LOG" >> $LOG_FILE
+  log "Retrying: restarting Nginx and testing again..."
+  # Restart Nginx
+  if [ "$(id -u)" -eq 0 ]; then
+    docker-compose restart nginx
+  else
+    sudo -E docker-compose restart nginx
+  fi
+  sleep 5
+  curl -sILk https://${DOMAIN_NAME} > "$HTTPS_TEST_LOG" 2>&1
+  https_status=$(grep "HTTP/" "$HTTPS_TEST_LOG" | tail -1 | awk '{print $2}')
+  if [[ ! "$https_status" =~ ^2[0-9]{2}$ ]]; then
+    log_error "Retry HTTPS request failed with status: $https_status"
+    cat "$HTTPS_TEST_LOG" >> $LOG_FILE
+    log "Gathering logs for diagnosis..."
+    if [ "$(id -u)" -eq 0 ]; then
+      docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
+      docker-compose logs --tail=100 wordpress-prod >> $LOG_FILE 2>&1
+    else
+      sudo -E docker-compose logs --tail=100 nginx >> $LOG_FILE 2>&1
+      sudo -E docker-compose logs --tail=100 wordpress-prod >> $LOG_FILE 2>&1
+    fi
+    error_exit "HTTPS test failed after retry: status $https_status"
+  else
+    log "HTTPS connection successful after retry (status: $https_status)"
+    cat "$HTTPS_TEST_LOG" >> $LOG_FILE
+  fi
 else
-  https_status=$(grep "HTTP/" /tmp/https_test.log | tail -1 | awk '{print $2}')
   log "HTTPS connection successful (status: $https_status)"
-  cat /tmp/https_test.log >> $LOG_FILE
+  cat "$HTTPS_TEST_LOG" >> $LOG_FILE
 fi
 
 # List certificates for verification

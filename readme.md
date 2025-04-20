@@ -100,9 +100,9 @@ docker-compose exec wordpress wp --allow-root plugin list
 
 ### Build & Push
 ```bash
-docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:vX.Y.Z .
+docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.2 .
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-docker push ghcr.io/tortoisewolfe/wp-dev:vX.Y.Z
+docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.2
 ```
 
 ### Deploy
@@ -229,9 +229,8 @@ To set up SSL with Let's Encrypt for your WordPress site:
    # - The script auto-detects the .env file in the repository root.
    # - Detailed logs are written to /tmp/ssl-setup-*.log by default.
    # - If Let's Encrypt rate limits are reached, it will fall back to a self-signed certificate.
-   # - For repeated end-to-end testing without hitting production rate limits, you can enable staging mode:
-   #     export STAGING=1
-   #     sudo bash -x scripts/ssl/ssl-setup.sh | tee ssl-setup-staging-$(date +%Y%m%d-%H%M%S).log
+   # - For repeated end-to-end testing without hitting production rate limits, you can enable staging mode with the new flag:
+   #     sudo bash -x scripts/ssl/ssl-setup.sh --staging | tee ssl-setup-staging-$(date +%Y%m%d-%H%M%S).log
    #   These certs are signed by the Let's Encrypt staging CA and not trusted by browsers but allow full workflow testing.
 
    The script automatically:
