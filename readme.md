@@ -9,11 +9,11 @@ A Docker-based WordPress environment with BuddyPress for development and product
 - Node.js v22 (via nvm)
 - npm
 - (Optional) Google Cloud SDK (for secrets)
+- (Optional) GitHub Personal Access Token (PAT) with read:packages, write:packages, repo scopes (for GHCR)
   
 ### Node.js v22 Installation
 
 We recommend using nvm to install Node.js v22:
-
 ```bash
 # Install or update nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
@@ -108,8 +108,14 @@ docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.2
 ### Deploy
 ```bash
 git pull origin main
+# Load secrets (including GITHUB_TOKEN for GHCR)
 ./scripts/setup-secrets.sh
-docker-compose up -d
+# Log in to GitHub Container Registry
+echo $GITHUB_TOKEN | docker login ghcr.io -u your_github_username --password-stdin
+# Pull latest images (avoid local rebuilds)
+docker-compose pull
+# Start containers without rebuilding images
+docker-compose up -d --no-build
 ```
 
 Or use the deploy script:

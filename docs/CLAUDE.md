@@ -139,6 +139,24 @@ source ./setup-secrets.sh
 sudo -E docker-compose up -d
 ```
 
+## 📝 Dev Notes for Pair Programming
+
+- Validate presence of `GITHUB_TOKEN` early in `setup-secrets.sh` and deployment scripts; fail fast with a clear error if missing.
+- Add `set -euo pipefail` at the top of all Bash scripts to enforce strict error handling.
+- Create a unified helper script (e.g., `scripts/deploy.sh`) or Makefile target encapsulating:
+  - `source ./scripts/setup-secrets.sh`
+  - GHCR login via `docker login`
+  - `docker-compose pull` and `docker-compose up --no-build`
+- Automate image updating logic in CI/CD, ensuring fresh pulls and no unintended rebuilds.
+- Structure `.env` variables by category (database, WordPress, SSL, GHCR) in `.env.example` and `readme.md`.
+- Support environment-specific `.env` files (`.env.development`, `.env.production`) and switch via an `ENV` variable.
+- Leverage Docker Compose profiles (`dev`, `prod`) to conditionally include services.
+- Document secret rotation procedures in Google Secret Manager and how to update deployed secrets.
+- Integrate GitHub Actions workflows for build, push, pull, and deploy steps, including secret injection.
+- Add service health checks (Nginx, DB) in documentation to verify readiness before routing traffic.
+- Ensure `.gitignore` explicitly excludes production `.env` files to avoid leaking secrets.
+- Provide example GitHub Actions YAML snippets for common automation tasks.
+
 ⚠️ **CRITICAL: ALWAYS run setup-secrets.sh before starting containers (especially wordpress-prod)!** ⚠️
 If you see "The MYSQL_PASSWORD variable is not set" errors, you forgot this step!
 
