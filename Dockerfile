@@ -25,15 +25,25 @@ RUN wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.ph
     # Verify the download
     wp --info
 
-# Download and extract BuddyPress plugin, BuddyX theme, and GamiPress
+# Download and extract BuddyPress plugin, BuddyX theme, GamiPress, and BuddyX recommended plugins
 RUN mkdir -p /var/www/html/wp-content/plugins /var/www/html/wp-content/themes && \
+    # Install core plugins: BuddyPress and GamiPress
     wget https://downloads.wordpress.org/plugin/buddypress.latest-stable.zip -O buddypress.zip && \
     unzip buddypress.zip -d /var/www/html/wp-content/plugins && rm buddypress.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress.latest-stable.zip -O gamipress.zip && \
     unzip gamipress.zip -d /var/www/html/wp-content/plugins && rm gamipress.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
     unzip gamipress-bp.zip -d /var/www/html/wp-content/plugins && rm gamipress-bp.zip && \
+    # Install BuddyX theme
     wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
+    unzip buddyx.zip -d /var/www/html/wp-content/themes && rm buddyx.zip && \
+    # Install BuddyX recommended plugins
+    wget https://downloads.wordpress.org/plugin/classic-widgets.latest-stable.zip -O classic-widgets.zip && \
+    unzip classic-widgets.zip -d /var/www/html/wp-content/plugins && rm classic-widgets.zip && \
+    wget https://downloads.wordpress.org/plugin/elementor.latest-stable.zip -O elementor.zip && \
+    unzip elementor.zip -d /var/www/html/wp-content/plugins && rm elementor.zip && \
+    wget https://downloads.wordpress.org/plugin/kirki.latest-stable.zip -O kirki.zip && \
+    unzip kirki.zip -d /var/www/html/wp-content/plugins && rm kirki.zip
 
 # Copy scripts
 COPY scripts/ /usr/local/bin/scripts/
@@ -85,14 +95,25 @@ RUN apt-get update && apt-get install -y wget unzip default-mysql-client
 RUN wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /usr/local/bin/wp && \
     chmod +x /usr/local/bin/wp
 
-# Download and extract BuddyPress plugin, BuddyX theme, and GamiPress plugins
+# Download and extract BuddyPress plugin, BuddyX theme, GamiPress, and BuddyX recommended plugins
 RUN mkdir -p /usr/src/wordpress/wp-content/plugins /usr/src/wordpress/wp-content/themes && \
+    # Install core plugins: BuddyPress and GamiPress
     wget https://downloads.wordpress.org/plugin/buddypress.latest-stable.zip -O buddypress.zip && \
     unzip buddypress.zip -d /usr/src/wordpress/wp-content/plugins && \
     rm buddypress.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress.latest-stable.zip -O gamipress.zip && \
     unzip gamipress.zip -d /usr/src/wordpress/wp-content/plugins && \
     rm gamipress.zip && \
+    # Install BuddyX recommended plugins
+    wget https://downloads.wordpress.org/plugin/classic-widgets.latest-stable.zip -O classic-widgets.zip && \
+    unzip classic-widgets.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm classic-widgets.zip && \
+    wget https://downloads.wordpress.org/plugin/elementor.latest-stable.zip -O elementor.zip && \
+    unzip elementor.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm elementor.zip && \
+    wget https://downloads.wordpress.org/plugin/kirki.latest-stable.zip -O kirki.zip && \
+    unzip kirki.zip -d /usr/src/wordpress/wp-content/plugins && \
+    rm kirki.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
     unzip gamipress-bp.zip -d /usr/src/wordpress/wp-content/plugins && \
     rm gamipress-bp.zip && \

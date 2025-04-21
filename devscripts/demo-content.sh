@@ -51,44 +51,229 @@ wp option get permalink_structure --path=/var/www/html
 # Make sure we have a useful message for the user
 echo "NOTE: While tutorial content is created using markdown format, the links in the curriculum page will work correctly with pretty URLs."
 
-# Make sure components are all initialized
-echo "Checking BuddyPress components..."
+# Make sure components are all initialized and activate necessary components
+echo "Checking and activating BuddyPress components..."
 wp bp component list --path=/var/www/html || true
 
-echo "Creating example users with Latin names..."
-# Array of Roman first names
-first_names=(
-    "Marcus" "Julius" "Gaius" "Titus" "Lucius" "Publius" "Quintus" "Aulus" "Decimus" "Servius"
-    "Livia" "Julia" "Claudia" "Octavia" "Antonia" "Valeria" "Cornelia" "Aurelia" "Flavia" "Domitia"
-)
+# Verify and activate components: site tracking, user groups, private messaging, friend requests
+echo "Verifying BuddyPress components status..."
+bp_components=$(wp bp component list --path=/var/www/html)
+echo "$bp_components"
 
-# Array of Roman family names
-last_names=(
-    "Aurelius" "Caesar" "Cicero" "Seneca" "Varro" "Cato" "Tullius" "Tacitus" "Augustus" "Antonius"
-    "Brutus" "Cassius" "Scipio" "Gracchus" "Sulla" "Marius" "Crassus" "Agrippa" "Tiberius" "Claudius"
+# Only activate components if they're not already active
+if ! echo "$bp_components" | grep -q "xprofile.*active"; then
+    echo "Activating xprofile component..."
+    wp bp component activate xprofile --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "settings.*active"; then
+    echo "Activating settings component..."
+    wp bp component activate settings --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "groups.*active"; then
+    echo "Activating groups component..."
+    wp bp component activate groups --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "friends.*active"; then
+    echo "Activating friends component..."
+    wp bp component activate friends --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "activity.*active"; then
+    echo "Activating activity component..."
+    wp bp component activate activity --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "messages.*active"; then
+    echo "Activating messages component..."
+    wp bp component activate messages --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "notifications.*active"; then
+    echo "Activating notifications component..."
+    wp bp component activate notifications --path=/var/www/html
+fi
+
+if ! echo "$bp_components" | grep -q "blogs.*active"; then
+    echo "Activating blogs component..."
+    wp bp component activate blogs --path=/var/www/html
+fi
+
+echo "All required BuddyPress components are now verified and activated!"
+
+# Verify the components are actually active
+echo "Confirming BuddyPress components final status:"
+wp bp component list --path=/var/www/html
+
+echo "Creating ScriptHammer band members..."
+
+# Define ScriptHammer band members data
+declare -A band_members
+set -x
+band_members=(
+    ["Ivory"]="Jazz piano and vintage synths|Melody Master|Serene, cerebral, occasionally mischievous with syncopations|Introduces motifs, themes, and call-and-response leads. Often starts the jam.|Glossy porcelain-white frame, clean curves, glowing blue inlays, elegant movement"
+    ["Crash"]="Full drum kit|Pulse Engine|Energetic, expressive, always in motion like a hyperactive metronome|Foundation of the groove. Drives fractal rhythms, improvises fills dynamically|Compact, spring-loaded limbs, polished brass armor with kinetic glyphs"
+    ["Chops"]="Franken-guitar|Harmonic Hacker|Street-smart, sardonic, thrives on chaos and crunchy chords|Harmonizer and glitcher. Adds harmonic color and raw textures|Punk aesthetic, asymmetrical plating, CRT screen eyes, tangled wires"
+    ["Reed"]="Alto sax|Lyrical Breeze|Cool-headed, introspective, speaks through his solos|Leads emotional peaks, expressive runs, jazz flourishes, and phrasing|Slim, chrome body, trench coat detail sculpted into chassis, LED eyes"
+    ["Brass"]="Trumpet|Frontline Flame|Showboat, loud and proud, always at the center of a solo|Punchy hooks, blazing leads, and rhythmic punctuation|Gleaming gold plating, spotlight-reactive finish, flared armor"
+    ["Verse"]="Vocoder & Mic|Soul Node|Passionate, poetic, the most 'human' of the bots|Delivers the message. Lyrics, emotion, storytelling|Holographic face panel with waveform lips, changing LED mouth"
+    ["Form"]="Control surface|Architect|Focused, observant, rarely speaks but always orchestrating|Arranger/producer. Builds transitions, balances layers, fractalizes loops|Gunmetal gray with flowing LED matrix, modular appendages"
 )
 
 # Check if we should skip demo content creation
 if $SKIP_DEMO || [ "$1" = "--skip-users" ] || [ "$1" = "-s" ]; then
-    echo "Skipping example users creation..."
+    echo "Skipping ScriptHammer band members creation..."
 else
-    # Create only 5 example users with Latin names for reduced load
-    for i in {1..5}; do
-        # Select random first and last name
-        rand_first=$((RANDOM % ${#first_names[@]}))
-        rand_last=$((RANDOM % ${#last_names[@]}))
+    # Create BuddyPress XProfile fields for band members
+    echo "Creating XProfile fields for band members..."
+    
+    # First make sure xprofile component is active
+    wp bp component activate xprofile --path=/var/www/html
+    
+    # Get existing field groups
+    group_id=$(wp bp xprofile group list --fields=id --format=ids --path=/var/www/html | head -n 1)
+    
+    if [ -z "$group_id" ]; then
+        # Create new field group if none exists
+        group_id=$(wp bp xprofile group create --name="ScriptHammer Profile" --description="Details about ScriptHammer band members" --path=/var/www/html --porcelain)
+    fi
+    
+    # Create the fields in the existing field group
+    instrument_field_id=$(wp bp xprofile field create --field-group-id=$group_id --name="Instrument" --type=textbox --path=/var/www/html --porcelain || echo "0")
+    role_field_id=$(wp bp xprofile field create --field-group-id=$group_id --name="Role" --type=textbox --path=/var/www/html --porcelain || echo "0")
+    personality_field_id=$(wp bp xprofile field create --field-group-id=$group_id --name="Personality" --type=textarea --path=/var/www/html --porcelain || echo "0")
+    style_field_id=$(wp bp xprofile field create --field-group-id=$group_id --name="Visual Style" --type=textarea --path=/var/www/html --porcelain || echo "0")
+    
+    echo "Created XProfile fields - Instrument ID: $instrument_field_id, Role ID: $role_field_id, Personality ID: $personality_field_id, Style ID: $style_field_id"
+
+    # Array to store user IDs for group creation later
+    band_user_ids=()
+
+    # Create the ScriptHammer band members
+    for member in "${!band_members[@]}"; do
+        IFS='|' read -r instrument role personality band_role visual_style <<< "${band_members[$member]}"
         
-        first_name="${first_names[$rand_first]}"
-        last_name="${last_names[$rand_last]}"
-        username=$(echo "${first_name}${last_name}" | tr '[:upper:]' '[:lower:]')
-        email="$username@example.com"
-        password="password"
+        username=$(echo "$member" | tr '[:upper:]' '[:lower:]')
+        email="$username@scripthammer.com"
+        password="script2025"
         
         if ! wp user get "$username" --path=/var/www/html --field=user_login &>/dev/null; then
-            wp user create "$username" "$email" --user_pass="$password" --first_name="$first_name" --last_name="$last_name" --role=subscriber --path=/var/www/html
+            echo "Creating ScriptHammer member: $member ($instrument)"
+            user_id=$(wp user create "$username" "$email" --user_pass="$password" --display_name="$member" --role=subscriber --path=/var/www/html --porcelain)
+            
+            # Store user ID for later group membership
+            band_user_ids+=($user_id)
+            
+            # Set the profile fields using the field IDs we got earlier
+            if [ "$instrument_field_id" != "0" ]; then
+                wp bp xprofile data set --user-id=$user_id --field-id=$instrument_field_id --value="$instrument" --path=/var/www/html || true
+            fi
+            
+            if [ "$role_field_id" != "0" ]; then
+                wp bp xprofile data set --user-id=$user_id --field-id=$role_field_id --value="$role" --path=/var/www/html || true
+            fi
+            
+            if [ "$personality_field_id" != "0" ]; then
+                wp bp xprofile data set --user-id=$user_id --field-id=$personality_field_id --value="$personality" --path=/var/www/html || true
+            fi
+            
+            if [ "$style_field_id" != "0" ]; then
+                wp bp xprofile data set --user-id=$user_id --field-id=$style_field_id --value="$visual_style" --path=/var/www/html || true
+            fi
+            
+            # Add a bio description
+            wp user meta update $user_id description "ScriptHammer member: $member. Role: $role. $personality" --path=/var/www/html
+            
+            echo "Created $member with instrument: $instrument and role: $role"
         else
-            echo "User $username already exists. Skipping."
+            user_id=$(wp user get "$username" --field=ID --path=/var/www/html)
+            band_user_ids+=($user_id)
+            echo "User $username already exists. Adding to band group."
         fi
+    done
+    
+    # Create a ScriptHammer group if it doesn't exist
+    if ! wp bp group get "scripthammer" --path=/var/www/html &>/dev/null; then
+        echo "Creating ScriptHammer band group..."
+        
+        # First make sure the groups component is active
+        wp bp component activate groups --path=/var/www/html || true
+        
+        # Add debug output to check if the groups component is actually active
+        echo "Verifying groups component is active:"
+        groups_active=$(wp bp component list --path=/var/www/html | grep -c "groups.*active")
+        if [ "$groups_active" -eq "0" ]; then
+            echo "WARNING: Groups component not active yet! Trying to activate again..."
+            wp bp component activate groups --path=/var/www/html || true
+            sleep 2
+        fi
+        
+        # Double-check if groups component is active
+        if wp bp component list --path=/var/www/html | grep -q "groups.*active"; then
+            echo "Groups component is active, proceeding with group creation."
+        else
+            echo "WARNING: Groups component still not active. Will try to create group anyway."
+        fi
+        
+        # Set the creator to Ivory (the first band member)
+        creator_id=${band_user_ids[0]}
+        creator_name=$(wp user get $creator_id --field=user_login --path=/var/www/html)
+        echo "Using band member with ID: $creator_id ($creator_name) as group creator"
+        
+        # Create the group with the creator - use the --porcelain flag to get just the group ID
+        echo "Creating ScriptHammer group with creator ID: $creator_id"
+        group_id=$(wp bp group create --name="ScriptHammer" --description="Futuristic jazz, fractal funk, cosmic rhythm cycles. The innovators behind 'Blue Dot Matrix' album." --status="public" --creator-id=$creator_id --path=/var/www/html --porcelain)
+        
+        # Verify the group was created
+        if [ -z "$group_id" ]; then
+            echo "ERROR: Failed to create ScriptHammer group!"
+        else
+            echo "Successfully created ScriptHammer group with ID: $group_id"
+            
+            # Add all remaining members to group (skip the first one since they're already in as creator)
+            for i in "${!band_user_ids[@]}"; do
+                # Skip first user as they're the group creator
+                if [ "$i" -eq "0" ]; then
+                    echo "Skipping ${band_user_ids[$i]} as they're the group creator"
+                    continue
+                fi
+                
+                member_id=${band_user_ids[$i]}
+                echo "Adding user ID: $member_id to ScriptHammer group"
+                wp bp group member add --group-id=$group_id --user-id=$member_id --path=/var/www/html || true
+                
+                # Verify the member was added successfully
+                if wp bp group member list --group-id=$group_id --path=/var/www/html | grep -q "$member_id"; then
+                    echo "✅ Successfully added user ID: $member_id to group"
+                else
+                    echo "⚠️ Could not verify user ID: $member_id was added to group"
+                fi
+            done
+            
+            # Verify the creator is an admin
+            echo "Verifying creator is an admin of the group..."
+            wp bp group member promote --group-id=$group_id --user-id=$creator_id --role=admin --path=/var/www/html || true
+            
+            # Create a welcome post in the group - post as the creator, not admin
+            echo "Creating welcome activity post in the group..."
+            wp bp activity create --component=groups --type=activity_update --user-id=$creator_id --content="Welcome to the official ScriptHammer group! We're a collective of musical bots creating futuristic jazz, fractal funk, and cosmic rhythm cycles. Our debut album 'Blue Dot Matrix' is coming soon. Stay tuned for release updates, behind-the-scenes looks, and exclusive content!" --item-id=$group_id --path=/var/www/html
+            
+            echo "Created ScriptHammer group with ID: $group_id and added all members."
+        fi
+    else
+        echo "ScriptHammer group already exists, skipping creation."
+    fi
+    
+    # Make the band members friends with each other
+    echo "Creating friendships between band members..."
+    for user1 in "${band_user_ids[@]}"; do
+        for user2 in "${band_user_ids[@]}"; do
+            if [ "$user1" != "$user2" ]; then
+                wp bp friend create --initiator-user-id=$user1 --friend-user-id=$user2 --path=/var/www/html &>/dev/null || true
+            fi
+        done
     done
 fi
 

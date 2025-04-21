@@ -122,6 +122,29 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
 
+## ⚠️ DEBUGGER NOTES: ScriptHammer Band Group Issue ⚠️
+
+The ScriptHammer band group shows "0 members" in the UI even though the backend database shows members exist. Key findings:
+
+1. Script `/devscripts/scripthammer.sh` creates users and adds them to a BuddyPress group
+2. Backend verification shows 12 confirmed members in database table `wp_bp_groups_members`
+3. UI still shows "0 members" at `http://172.26.72.153:8000/members/ivory/groups/`
+4. Attempted fixes:
+   - Added direct database entries with `is_confirmed=1`
+   - Updated user metadata with `bp_confirmed_member_of_group_*`
+   - Manually updated member count in database
+   - Cleared WordPress and BuddyPress caches
+   - Rewritten script to handle both existing and new groups correctly
+
+Debug steps:
+1. Check the BuddyPress version - there might be differences in how member counts are stored/calculated between versions
+2. Examine BuddyPress theme templates that display group members
+3. Look for any group-member count transients in the wp_options table that need clearing
+4. Test on a totally fresh install by running `docker-compose down -v` then `docker-compose up -d`
+5. Check for any group member status other than `is_confirmed=1` that might be needed
+6. Examine BuddyPress REST API responses for group member data
+7. Verify if this is just a display issue or if functionality is also affected
+
 ## Google Secret Manager Configuration
 The following secrets are stored in Google Secret Manager and should NOT be duplicated in .env:
 - GITHUB_TOKEN - GitHub personal access token

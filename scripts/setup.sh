@@ -55,11 +55,59 @@ wp plugin activate buddypress --path=/var/www/html || handle_error $LINENO
 # Install GamiPress plugins (always)
 echo "Installing GamiPress plugins..."
 wp plugin install gamipress --activate --path=/var/www/html || handle_error $LINENO
-# Install additional GamiPress add-ons
-wp plugin install gamipress-buddypress-integration --activate --path=/var/www/html || echo "Warning: Could not install GamiPress-BuddyPress integration"
 
-echo "Activating BuddyX theme..."
+# Check for GamiPress BuddyPress integration
+echo "Setting up GamiPress BuddyPress integration..."
+if wp plugin is-installed gamipress-buddypress-integration --path=/var/www/html; then
+    echo "GamiPress BuddyPress integration already installed, activating..."
+    wp plugin activate gamipress-buddypress-integration --path=/var/www/html || echo "Warning: Failed to activate GamiPress-BuddyPress integration"
+else
+    echo "Installing GamiPress BuddyPress integration..."
+    wp plugin install gamipress-buddypress-integration --activate --path=/var/www/html || echo "Warning: Could not install GamiPress-BuddyPress integration"
+fi
+
+# Verify GamiPress plugins activation status
+echo "Verifying GamiPress plugins activation status:"
+wp plugin list --path=/var/www/html | grep -E 'gamipress'
+
+# Install and activate BuddyX theme and recommended plugins
+echo "Activating BuddyX theme and installing recommended plugins..."
 wp theme activate buddyx --path=/var/www/html || handle_error $LINENO
+
+# Install BuddyX recommended plugins with improved handling
+echo "Installing and activating recommended plugins for BuddyX theme..."
+
+# Check if plugins are already installed first, then activate them
+echo "Checking for Classic Widgets plugin..."
+if wp plugin is-installed classic-widgets --path=/var/www/html; then
+    echo "Classic Widgets plugin already installed, activating..."
+    wp plugin activate classic-widgets --path=/var/www/html || echo "Warning: Failed to activate Classic Widgets plugin"
+else
+    echo "Installing Classic Widgets plugin..."
+    wp plugin install classic-widgets --activate --path=/var/www/html || echo "Warning: Failed to install Classic Widgets plugin"
+fi
+
+echo "Checking for Elementor plugin..."
+if wp plugin is-installed elementor --path=/var/www/html; then
+    echo "Elementor plugin already installed, activating..."
+    wp plugin activate elementor --path=/var/www/html || echo "Warning: Failed to activate Elementor plugin"
+else
+    echo "Installing Elementor plugin..."
+    wp plugin install elementor --activate --path=/var/www/html || echo "Warning: Failed to install Elementor plugin"
+fi
+
+echo "Checking for Kirki plugin..."
+if wp plugin is-installed kirki --path=/var/www/html; then
+    echo "Kirki plugin already installed, activating..."
+    wp plugin activate kirki --path=/var/www/html || echo "Warning: Failed to activate Kirki plugin"
+else
+    echo "Installing Kirki plugin..."
+    wp plugin install kirki --activate --path=/var/www/html || echo "Warning: Failed to install Kirki plugin"
+fi
+
+# Verify plugins are activated
+echo "Verifying BuddyX recommended plugins activation status:"
+wp plugin list --path=/var/www/html | grep -E 'classic-widgets|elementor|kirki'
 
 # Set permalink structure and ensure site URL is correct
 echo "Setting permalink structure and ensuring site URLs are correct..."
@@ -91,11 +139,44 @@ fi
 
 # Enable BuddyPress components one by one with error handling
 echo "Enabling BuddyPress components..."
-# This activates all components in a safer way
-wp bp component list --format=json --path=/var/www/html | grep -o '"component_id":"[^"]*"' | sed 's/"component_id":"//;s/"//' | while read -r component; do
-    echo "Activating component: $component"
-    wp bp component activate "$component" --path=/var/www/html || echo "Failed to activate $component, continuing..."
+
+# First, modify the MySQL mode to avoid STRICT_TRANS_TABLES errors with BuddyPress
+echo "Modifying MySQL mode to be compatible with BuddyPress..."
+mysql -h "${WORDPRESS_DB_HOST%:*}" -u"${WORDPRESS_DB_USER}" -p"${WORDPRESS_DB_PASSWORD}" -e "SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'STRICT_TRANS_TABLES',''));" || echo "Could not modify MySQL mode, some BuddyPress components might fail to activate."
+
+# Explicitly activate each component needed for ScriptHammer
+echo "Activating required BuddyPress components with better error handling..."
+
+# First activate core components that other components depend on
+echo "Activating core BuddyPress components first..."
+wp bp component activate xprofile --path=/var/www/html || true
+wp bp component activate settings --path=/var/www/html || true
+wp bp component activate members --path=/var/www/html || true
+
+# Wait a moment for these to take effect
+sleep 2
+
+# Now activate all components with proper handling
+COMPONENTS_TO_ACTIVATE="xprofile settings groups activity notifications friends messages blogs"
+
+for component in $COMPONENTS_TO_ACTIVATE; do
+    echo "Activating BuddyPress component: $component"
+    wp bp component activate $component --path=/var/www/html || true
+    
+    # Verify activation
+    if wp bp component list --path=/var/www/html | grep -q "$component.*active"; then
+        echo "✅ Successfully activated $component component"
+    else
+        echo "⚠️ Could not verify $component component activation, will try again..."
+        # Try one more time with delay
+        sleep 2
+        wp bp component activate $component --path=/var/www/html || echo "Failed to activate $component component after retry"
+    fi
 done
+
+# Verify the current state of components
+echo "Verifying BuddyPress components status:"
+wp bp component list --path=/var/www/html
 
 # Check for demo content flag and run the script if not skipped
 if [ "${SKIP_DEMO_CONTENT}" != "true" ]; then
