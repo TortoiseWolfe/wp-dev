@@ -66,9 +66,28 @@ else
     wp plugin install gamipress-buddypress-integration --activate --path=/var/www/html || echo "Warning: Could not install GamiPress-BuddyPress integration"
 fi
 
+# Install simple-gamification plugin
+echo "Installing simple-gamification plugin..."
+# Create plugins directory if it doesn't exist
+if [ ! -d "/var/www/html/wp-content/plugins" ]; then
+    mkdir -p /var/www/html/wp-content/plugins
+    chown www-data:www-data /var/www/html/wp-content/plugins
+fi
+
+# Copy the simple-gamification.php to plugins directory
+if [ -f "/usr/local/bin/devscripts/simple-gamification.php" ]; then
+    cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-gamification.php
+    chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification.php
+    chmod 644 /var/www/html/wp-content/plugins/simple-gamification.php
+    wp plugin activate simple-gamification --path=/var/www/html || echo "Warning: Failed to activate simple-gamification plugin"
+    echo "Simple gamification plugin installed and activated"
+else
+    echo "Warning: simple-gamification.php not found in devscripts"
+fi
+
 # Verify GamiPress plugins activation status
 echo "Verifying GamiPress plugins activation status:"
-wp plugin list --path=/var/www/html | grep -E 'gamipress'
+wp plugin list --path=/var/www/html | grep -E 'gamipress|simple-gamification'
 
 # Install and activate BuddyX theme and recommended plugins
 echo "Activating BuddyX theme and installing recommended plugins..."
@@ -144,38 +163,69 @@ echo "Enabling BuddyPress components..."
 echo "Modifying MySQL mode to be compatible with BuddyPress..."
 mysql -h "${WORDPRESS_DB_HOST%:*}" -u"${WORDPRESS_DB_USER}" -p"${WORDPRESS_DB_PASSWORD}" -e "SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'STRICT_TRANS_TABLES',''));" || echo "Could not modify MySQL mode, some BuddyPress components might fail to activate."
 
+# Deactivate any existing components to ensure clean activation
+echo "Clearing existing component states for clean activation..."
+wp bp component deactivate friends messages blogs --path=/var/www/html || true
+sleep 1
+
 # Explicitly activate each component needed for ScriptHammer
-echo "Activating required BuddyPress components with better error handling..."
+echo "Activating required BuddyPress components with improved error handling..."
 
 # First activate core components that other components depend on
 echo "Activating core BuddyPress components first..."
 wp bp component activate xprofile --path=/var/www/html || true
 wp bp component activate settings --path=/var/www/html || true
 wp bp component activate members --path=/var/www/html || true
+wp bp component activate groups --path=/var/www/html || true
+wp bp component activate activity --path=/var/www/html || true
+wp bp component activate notifications --path=/var/www/html || true
 
-# Wait a moment for these to take effect
-sleep 2
+# Wait for these to take effect
+sleep 3
 
-# Now activate all components with proper handling
-COMPONENTS_TO_ACTIVATE="xprofile settings groups activity notifications friends messages blogs"
+# Individually activate each remaining component with proper error checking
+echo "Activating friends component..."
+if ! wp bp component activate friends --path=/var/www/html; then
+    echo "Failed to activate friends component on first try, retrying with delay..."
+    sleep 2
+    wp bp component activate friends --path=/var/www/html || echo "ERROR: Friends component activation failed!"
+fi
 
-for component in $COMPONENTS_TO_ACTIVATE; do
-    echo "Activating BuddyPress component: $component"
-    wp bp component activate $component --path=/var/www/html || true
-    
-    # Verify activation
-    if wp bp component list --path=/var/www/html | grep -q "$component.*active"; then
-        echo "✅ Successfully activated $component component"
+echo "Activating messages component..."
+if ! wp bp component activate messages --path=/var/www/html; then
+    echo "Failed to activate messages component on first try, retrying with delay..."
+    sleep 2
+    wp bp component activate messages --path=/var/www/html || echo "ERROR: Messages component activation failed!"
+fi
+
+echo "Activating blogs component..."
+if ! wp bp component activate blogs --path=/var/www/html; then
+    echo "Failed to activate blogs component on first try, retrying with delay..."
+    sleep 2
+    wp bp component activate blogs --path=/var/www/html || echo "ERROR: Blogs component activation failed!"
+fi
+
+# Verify all components are active
+echo "Verifying BuddyPress components status..."
+ALL_ACTIVE=true
+for component in xprofile settings members groups activity notifications friends messages blogs; do
+    if ! wp bp component list --path=/var/www/html | grep -q "$component.*active"; then
+        echo "❌ ERROR: $component component is NOT active!"
+        ALL_ACTIVE=false
     else
-        echo "⚠️ Could not verify $component component activation, will try again..."
-        # Try one more time with delay
-        sleep 2
-        wp bp component activate $component --path=/var/www/html || echo "Failed to activate $component component after retry"
+        echo "✅ $component component is active"
     fi
 done
 
-# Verify the current state of components
-echo "Verifying BuddyPress components status:"
+if [ "$ALL_ACTIVE" = false ]; then
+    echo "WARNING: Not all BuddyPress components were activated successfully."
+    echo "This may affect the functionality of the site."
+else
+    echo "SUCCESS: All BuddyPress components activated correctly."
+fi
+
+# Display final component state
+echo "Final BuddyPress components status:"
 wp bp component list --path=/var/www/html
 
 # Check for demo content flag and run the script if not skipped
@@ -186,6 +236,24 @@ else
   echo "Skipping random demo content, but still creating tutorial content..."
   # Still create tutorial content even when skipping demo content
   /usr/local/bin/devscripts/demo-content.sh --skip-all
+fi
+
+# Run the ScriptHammer band setup script to create band members, group, and Ivory's posts
+echo "Creating ScriptHammer band members and group..."
+if [ -x /usr/local/bin/devscripts/scripthammer.sh ]; then
+  # Ensure script is executable
+  chmod +x /usr/local/bin/devscripts/scripthammer.sh
+  # Run the script
+  /usr/local/bin/devscripts/scripthammer.sh
+  
+  # Verify the group was created
+  if wp bp group get scripthammer --path=/var/www/html > /dev/null 2>&1; then
+    echo "✅ ScriptHammer band group created successfully!"
+  else
+    echo "❌ ERROR: ScriptHammer band group was not created properly!"
+  fi
+else
+  echo "⚠️ WARNING: scripthammer.sh script not found or not executable"
 fi
 
 echo "Content creation process started in background - it may take a few minutes to complete."

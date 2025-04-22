@@ -21,6 +21,9 @@ class Simple_BP_Gamification {
         
         // Add reset button to footer
         add_action('wp_footer', array($this, 'add_reset_button'));
+        
+        // Fix BuddyX theme category display issue - it only shows first category by default
+        add_action('wp_head', array($this, 'fix_buddyx_category_display'));
     }
     
     /**
@@ -217,6 +220,99 @@ class Simple_BP_Gamification {
                 </button>
             </div>';
         }
+    }
+    
+    /**
+     * Fix BuddyX theme's category display limitation
+     * By default, BuddyX theme only shows the first category even if a post has multiple categories
+     */
+    public function fix_buddyx_category_display() {
+        // Buffer the output to prevent potential issues
+        ob_start();
+        ?>
+        <style>
+            .post-meta-category {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            .post-meta-category__item {
+                display: inline-block !important;
+                margin-right: 5px;
+            }
+        </style>
+        <script>
+            // More aggressive fix - actually add all categories to the post display
+            document.addEventListener('DOMContentLoaded', function() {
+                // Function to get all categories for a post
+                async function fetchCategories(postId) {
+                    try {
+                        // Use WordPress REST API to get the post's categories
+                        const response = await fetch('/wp-json/wp/v2/posts/' + postId + '?_embed');
+                        if (!response.ok) return null;
+                        
+                        const postData = await response.json();
+                        if (!postData.categories || !postData._embedded || !postData._embedded['wp:term']) {
+                            return null;
+                        }
+                        
+                        // Find the category terms
+                        let categories = [];
+                        for (const termGroup of postData._embedded['wp:term']) {
+                            for (const term of termGroup) {
+                                if (term.taxonomy === 'category') {
+                                    categories.push(term);
+                                }
+                            }
+                        }
+                        
+                        return categories;
+                    } catch (error) {
+                        console.error('Error fetching categories:', error);
+                        return null;
+                    }
+                }
+                
+                // Add all categories to the post header
+                const addAllCategories = async () => {
+                    // Check if we're on a single post page
+                    const postContainer = document.querySelector('article.post');
+                    if (!postContainer) return;
+                    
+                    // Get the post ID
+                    const postId = postContainer.id.replace('post-', '');
+                    if (!postId) return;
+                    
+                    // Get categories
+                    const categories = await fetchCategories(postId);
+                    if (!categories || categories.length <= 1) return;
+                    
+                    // Find the category container
+                    const categoryContainer = document.querySelector('.post-meta-category');
+                    if (!categoryContainer) return;
+                    
+                    // Clear existing content and add all categories
+                    categoryContainer.innerHTML = '';
+                    
+                    // Add all categories
+                    categories.forEach(category => {
+                        const categoryItem = document.createElement('div');
+                        categoryItem.className = 'post-meta-category__item';
+                        categoryItem.innerHTML = `
+                            <a href="/category/${category.slug}/" class="post-meta-category__link">
+                                ${category.name}
+                            </a>
+                        `;
+                        categoryContainer.appendChild(categoryItem);
+                    });
+                };
+                
+                // Run the function
+                addAllCategories();
+            });
+        </script>
+        <?php
+        ob_end_flush();
     }
 }
 

@@ -2,9 +2,6 @@
 # ScriptHammer band members creation script
 set -e
 
-# Add fix for permissions - make script executable inside container
-chmod +x "$(realpath "$0")" 2>/dev/null || true
-
 # Enable debugging if requested
 if [ "$1" = "debug" ]; then
     set -x
@@ -447,46 +444,73 @@ if [ "$existing_posts" -lt "2" ]; then
     
     # Directly create both posts in sequence
     echo "Creating band formation post..."
-    
-    # First, explicitly create needed categories with correct slugs
-    echo "Creating all needed categories first..."
-    wp term create category "Music" --slug="music" --path=/var/www/html || true
-    wp term create category "Tour" --slug="tour" --path=/var/www/html || true
-    
-    # Get category IDs by numeric ID (more reliable)
-    MUSIC_CAT_ID=$(wp term list category --slug=music --fields=term_id --format=ids --path=/var/www/html)
-    TOUR_CAT_ID=$(wp term list category --slug=tour --fields=term_id --format=ids --path=/var/www/html)
-    
-    echo "Using category IDs - Music: $MUSIC_CAT_ID, Tour: $TOUR_CAT_ID"
-    
-    # Now create post with explicit category assignment
     formation_id=$(wp post create --post_title="The Birth of ScriptHammer: How We Came Together" \
                    --post_content="$band_formation_post_content" \
                    --post_status="publish" \
                    --post_author="$creator_id" \
-                   --post_category=$MUSIC_CAT_ID \
                    --porcelain \
                    --path=/var/www/html)
                    
     if [ -n "$formation_id" ]; then
         echo "Created band formation post with ID: $formation_id"
+        
+        # Add the Music category to the post - getting category ID directly by slug
+        REAL_MUSIC_ID=$(wp term get category music --by=slug --field=term_id --path=/var/www/html)
+        if [ -n "$REAL_MUSIC_ID" ]; then
+            # Only add if we found a valid ID
+            wp post term add $formation_id category $REAL_MUSIC_ID --path=/var/www/html || true
+            echo "Added Music category (ID: $REAL_MUSIC_ID) to post"
+        else
+            # Create the category if it doesn't exist
+            wp term create category "Music" --slug="music" --path=/var/www/html || true
+            NEW_MUSIC_ID=$(wp term get category music --by=slug --field=term_id --path=/var/www/html)
+            wp post term add $formation_id category $NEW_MUSIC_ID --path=/var/www/html || true
+            echo "Created and added Music category (ID: $NEW_MUSIC_ID) to post"
+        fi
+        
+        # Remove the default category
+        wp post term remove $formation_id category $DEFAULT_CAT_ID --path=/var/www/html || true
     fi
     
     echo "Creating tour announcement post..."
-    # Create post with both categories at once
     tour_id=$(wp post create --post_title="ScriptHammer Announces: The Aether Trail Tour of 1848" \
                    --post_content="$tour_announcement_post_content" \
                    --post_status="publish" \
                    --post_author="$creator_id" \
-                   --post_category="$MUSIC_CAT_ID,$TOUR_CAT_ID" \
                    --porcelain \
                    --path=/var/www/html)
     
     if [ -n "$tour_id" ]; then
-        echo "Created tour announcement post with ID: $tour_id with categories Music and Tour"
+        echo "Created tour announcement post with ID: $tour_id"
         
-        # Verify categories
-        wp post term list $tour_id category --format=csv --path=/var/www/html || true
+        # First add the Music category
+        REAL_MUSIC_ID=$(wp term get category music --by=slug --field=term_id --path=/var/www/html)
+        if [ -n "$REAL_MUSIC_ID" ]; then
+            wp post term add $tour_id category $REAL_MUSIC_ID --path=/var/www/html || true
+            echo "Added Music category (ID: $REAL_MUSIC_ID) to tour post"
+        else
+            # Create the category if it doesn't exist
+            wp term create category "Music" --slug="music" --path=/var/www/html || true
+            NEW_MUSIC_ID=$(wp term get category music --by=slug --field=term_id --path=/var/www/html)
+            wp post term add $tour_id category $NEW_MUSIC_ID --path=/var/www/html || true
+            echo "Created and added Music category (ID: $NEW_MUSIC_ID) to tour post"
+        fi
+        
+        # Then add the Tour category
+        REAL_TOUR_ID=$(wp term get category tour --by=slug --field=term_id --path=/var/www/html)
+        if [ -n "$REAL_TOUR_ID" ]; then
+            wp post term add $tour_id category $REAL_TOUR_ID --path=/var/www/html || true
+            echo "Added Tour category (ID: $REAL_TOUR_ID) to post"
+        else
+            # Create the category if it doesn't exist
+            wp term create category "Tour" --slug="tour" --path=/var/www/html || true
+            NEW_TOUR_ID=$(wp term get category tour --by=slug --field=term_id --path=/var/www/html)
+            wp post term add $tour_id category $NEW_TOUR_ID --path=/var/www/html || true
+            echo "Created and added Tour category (ID: $NEW_TOUR_ID) to post"
+        fi
+        
+        # Remove the default category
+        wp post term remove $tour_id category $DEFAULT_CAT_ID --path=/var/www/html || true
         
         echo "Added proper categories to both posts"
     fi

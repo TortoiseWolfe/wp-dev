@@ -122,9 +122,27 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
 
-## ⚠️ DEBUGGER NOTES: ScriptHammer Band Group Issue ⚠️
+## ⚠️ DEBUGGER NOTES: ScriptHammer Issues ⚠️
+
+### Band Group Member Display Issue
 
 The ScriptHammer band group shows "0 members" in the UI even though the backend database shows members exist. Key findings:
+
+### Post Category Display Issues
+
+Two category display issues have been fixed:
+
+1. **Numeric Category IDs**: Previously, categories sometimes displayed as a numeric ID (e.g., "3") instead of their proper name ("Tour"). Fixed by:
+   - Creating categories first with proper slugs before assigning to posts
+   - Using `term list` to get category IDs by slug reliably 
+   - Assigning categories during post creation with the `--post_category` parameter
+
+2. **BuddyX Theme Limitation**: BuddyX theme only shows the first category in posts with multiple categories. Fixed by:
+   - Adding a CSS/JS fix to `simple-gamification.php` plugin
+   - The fix ensures all categories in a post are displayed, not just the first one
+   - This plugin-based approach survives theme updates (following WordPress best practices)
+
+Note: The second issue is a limitation in the BuddyX theme's template, specifically in `entry_categories.php` which contains a `break` after displaying the first category.
 
 1. Script `/devscripts/scripthammer.sh` creates users and adds them to a BuddyPress group
 2. Backend verification shows 12 confirmed members in database table `wp_bp_groups_members`

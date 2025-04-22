@@ -32,8 +32,8 @@ RUN mkdir -p /var/www/html/wp-content/plugins /var/www/html/wp-content/themes &&
     unzip buddypress.zip -d /var/www/html/wp-content/plugins && rm buddypress.zip && \
     wget https://downloads.wordpress.org/plugin/gamipress.latest-stable.zip -O gamipress.zip && \
     unzip gamipress.zip -d /var/www/html/wp-content/plugins && rm gamipress.zip && \
-    wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
-    unzip gamipress-bp.zip -d /var/www/html/wp-content/plugins && rm gamipress-bp.zip && \
+    # Note: We don't install the gamipress-buddypress-integration plugin because it conflicts with
+    # the built-in BuddyPress integration in the GamiPress plugin
     # Install BuddyX theme
     wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
     unzip buddyx.zip -d /var/www/html/wp-content/themes && rm buddyx.zip && \
@@ -114,9 +114,8 @@ RUN mkdir -p /usr/src/wordpress/wp-content/plugins /usr/src/wordpress/wp-content
     wget https://downloads.wordpress.org/plugin/kirki.latest-stable.zip -O kirki.zip && \
     unzip kirki.zip -d /usr/src/wordpress/wp-content/plugins && \
     rm kirki.zip && \
-    wget https://downloads.wordpress.org/plugin/gamipress-buddypress-integration.latest-stable.zip -O gamipress-bp.zip && \
-    unzip gamipress-bp.zip -d /usr/src/wordpress/wp-content/plugins && \
-    rm gamipress-bp.zip && \
+    # Note: We don't install the gamipress-buddypress-integration plugin because it conflicts with
+    # the built-in BuddyPress integration in the GamiPress plugin
     wget https://downloads.wordpress.org/theme/buddyx.latest-stable.zip -O buddyx.zip && \
     unzip buddyx.zip -d /usr/src/wordpress/wp-content/themes && \
     rm buddyx.zip
