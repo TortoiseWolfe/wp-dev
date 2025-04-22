@@ -19,14 +19,248 @@ done
 
 echo "Creating ScriptHammer band members..."
 
-# Make sure BuddyPress is active
-echo "Verifying BuddyPress is active..."
+# Make sure BuddyPress is active and database tables are created
+echo "Verifying BuddyPress is active and database tables exist..."
 if ! wp plugin is-active buddypress --path=/var/www/html; then
     echo "BuddyPress is not active. Activating..."
     wp plugin activate buddypress --path=/var/www/html || {
         echo "Failed to activate BuddyPress. Exiting."
         exit 1
     }
+fi
+
+# Check if the BuddyPress database tables are created - a common issue causing content creation to fail
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_groups'" --path=/var/www/html | grep -q "wp_bp_groups"; then
+    echo "BuddyPress database tables missing. Creating them directly..."
+    
+    # Create tables directly with SQL - most reliable method
+    echo "Creating BuddyPress groups tables with SQL..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_groups (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        creator_id bigint(20) NOT NULL,
+        name varchar(100) NOT NULL,
+        slug varchar(200) NOT NULL,
+        description longtext NOT NULL,
+        status varchar(10) NOT NULL DEFAULT 'public',
+        parent_id bigint(20) NOT NULL DEFAULT 0,
+        enable_forum tinyint(1) NOT NULL DEFAULT '1',
+        date_created datetime NOT NULL,
+        PRIMARY KEY (id),
+        KEY creator_id (creator_id),
+        KEY status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;" --path=/var/www/html
+
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_groups_members (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        group_id bigint(20) NOT NULL,
+        user_id bigint(20) NOT NULL,
+        inviter_id bigint(20) NOT NULL,
+        is_admin tinyint(1) NOT NULL DEFAULT '0',
+        is_mod tinyint(1) NOT NULL DEFAULT '0',
+        user_title varchar(100) NOT NULL,
+        date_modified datetime NOT NULL,
+        comments longtext NOT NULL,
+        is_confirmed tinyint(1) NOT NULL DEFAULT '0',
+        is_banned tinyint(1) NOT NULL DEFAULT '0',
+        invite_sent tinyint(1) NOT NULL DEFAULT '0',
+        PRIMARY KEY (id),
+        KEY group_id (group_id),
+        KEY is_admin (is_admin),
+        KEY is_mod (is_mod),
+        KEY user_id (user_id),
+        KEY inviter_id (inviter_id),
+        KEY is_confirmed (is_confirmed)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;" --path=/var/www/html
+
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_groups_groupmeta (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        group_id bigint(20) NOT NULL,
+        meta_key varchar(255) DEFAULT NULL,
+        meta_value longtext,
+        PRIMARY KEY (id),
+        KEY group_id (group_id),
+        KEY meta_key (meta_key(191))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;" --path=/var/www/html
+    
+    # Also try to reactivate the plugin to trigger other table creation
+    wp plugin deactivate buddypress --path=/var/www/html
+    wp plugin activate buddypress --path=/var/www/html
+    
+    # Verify the tables were created
+    if ! wp db query "SHOW TABLES LIKE 'wp_bp_groups'" --path=/var/www/html | grep -q "wp_bp_groups"; then
+        echo "❌ ERROR: Failed to create BuddyPress database tables. Content creation will likely fail."
+        echo "You may need to manually deactivate and reactivate BuddyPress from the WordPress admin."
+        exit 1
+    else
+        echo "✅ BuddyPress database tables created successfully."
+    fi
+fi
+
+# Create missing BuddyPress database tables if needed
+echo "Creating any missing BuddyPress database tables..."
+
+# Check for xprofile_data table (often missing)
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_xprofile_data'" --path=/var/www/html | grep -q "wp_bp_xprofile_data"; then
+    echo "Creating missing BuddyPress XProfile Data table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_xprofile_data (
+        id bigint(20) unsigned NOT NULL auto_increment,
+        field_id bigint(20) unsigned NOT NULL,
+        user_id bigint(20) unsigned NOT NULL,
+        value longtext NOT NULL,
+        last_updated datetime NOT NULL,
+        PRIMARY KEY (id),
+        KEY field_id (field_id),
+        KEY user_id (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for xprofile_groups table
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_xprofile_groups'" --path=/var/www/html | grep -q "wp_bp_xprofile_groups"; then
+    echo "Creating missing BuddyPress XProfile Groups table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_xprofile_groups (
+        id bigint(20) unsigned NOT NULL auto_increment,
+        name varchar(150) NOT NULL,
+        description longtext NOT NULL,
+        group_order bigint(20) NOT NULL default 0,
+        can_delete tinyint(1) NOT NULL default 1,
+        PRIMARY KEY (id),
+        KEY can_delete (can_delete)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for xprofile_fields table
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_xprofile_fields'" --path=/var/www/html | grep -q "wp_bp_xprofile_fields"; then
+    echo "Creating missing BuddyPress XProfile Fields table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_xprofile_fields (
+        id bigint(20) unsigned NOT NULL auto_increment,
+        group_id bigint(20) unsigned NOT NULL,
+        parent_id bigint(20) unsigned NOT NULL,
+        type varchar(150) NOT NULL,
+        name varchar(150) NOT NULL,
+        description longtext NOT NULL,
+        is_required tinyint(1) NOT NULL DEFAULT '0',
+        is_default_option tinyint(1) NOT NULL DEFAULT '0',
+        field_order bigint(20) NOT NULL DEFAULT '0',
+        option_order bigint(20) NOT NULL DEFAULT '0',
+        order_by varchar(15) NOT NULL DEFAULT '',
+        can_delete tinyint(1) NOT NULL DEFAULT '1',
+        PRIMARY KEY (id),
+        KEY group_id (group_id),
+        KEY parent_id (parent_id),
+        KEY field_order (field_order),
+        KEY can_delete (can_delete),
+        KEY is_required (is_required)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for xprofile_meta table
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_xprofile_meta'" --path=/var/www/html | grep -q "wp_bp_xprofile_meta"; then
+    echo "Creating missing BuddyPress XProfile Meta table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_xprofile_meta (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        object_id bigint(20) NOT NULL,
+        object_type varchar(150) NOT NULL DEFAULT '',
+        meta_key varchar(255) DEFAULT NULL,
+        meta_value longtext,
+        PRIMARY KEY (id),
+        KEY object_id (object_id),
+        KEY meta_key (meta_key(191))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for activity table
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_activity'" --path=/var/www/html | grep -q "wp_bp_activity"; then
+    echo "Creating missing BuddyPress Activity table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_activity (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) NOT NULL,
+        component varchar(75) NOT NULL,
+        type varchar(75) NOT NULL,
+        action text NOT NULL,
+        content longtext NOT NULL,
+        primary_link varchar(255) NOT NULL,
+        item_id bigint(20) NOT NULL,
+        secondary_item_id bigint(20) DEFAULT NULL,
+        date_recorded datetime NOT NULL,
+        hide_sitewide tinyint(1) DEFAULT 0,
+        mptt_left int(11) NOT NULL DEFAULT 0,
+        mptt_right int(11) NOT NULL DEFAULT 0,
+        is_spam tinyint(1) NOT NULL DEFAULT 0,
+        PRIMARY KEY (id),
+        KEY date_recorded (date_recorded),
+        KEY user_id (user_id),
+        KEY item_id (item_id),
+        KEY secondary_item_id (secondary_item_id),
+        KEY component (component),
+        KEY type (type),
+        KEY mptt_left (mptt_left),
+        KEY mptt_right (mptt_right),
+        KEY hide_sitewide (hide_sitewide),
+        KEY is_spam (is_spam)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for activity meta table 
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_activity_meta'" --path=/var/www/html | grep -q "wp_bp_activity_meta"; then
+    echo "Creating missing BuddyPress Activity Meta table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_activity_meta (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        activity_id bigint(20) NOT NULL,
+        meta_key varchar(255) DEFAULT NULL,
+        meta_value longtext DEFAULT NULL,
+        PRIMARY KEY (id),
+        KEY activity_id (activity_id),
+        KEY meta_key (meta_key(191))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for notifications table
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_notifications'" --path=/var/www/html | grep -q "wp_bp_notifications"; then
+    echo "Creating missing BuddyPress Notifications table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_notifications (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) NOT NULL,
+        item_id bigint(20) NOT NULL,
+        secondary_item_id bigint(20) DEFAULT NULL,
+        component_name varchar(75) NOT NULL,
+        component_action varchar(75) NOT NULL,
+        date_notified datetime NOT NULL,
+        is_new tinyint(1) NOT NULL DEFAULT 0,
+        PRIMARY KEY (id),
+        KEY item_id (item_id),
+        KEY secondary_item_id (secondary_item_id),
+        KEY user_id (user_id),
+        KEY is_new (is_new),
+        KEY component_name (component_name),
+        KEY component_action (component_action),
+        KEY useritem (user_id,is_new)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+# Check for blogs-related tables
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_user_blogs'" --path=/var/www/html | grep -q "wp_bp_user_blogs"; then
+    echo "Creating missing BuddyPress Blogs table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_user_blogs (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) NOT NULL,
+        blog_id bigint(20) NOT NULL,
+        PRIMARY KEY (id),
+        KEY user_id (user_id),
+        KEY blog_id (blog_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
+fi
+
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_user_blogs_blogmeta'" --path=/var/www/html | grep -q "wp_bp_user_blogs_blogmeta"; then
+    echo "Creating missing BuddyPress Blogs Meta table..."
+    wp db query "CREATE TABLE IF NOT EXISTS wp_bp_user_blogs_blogmeta (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        blog_id bigint(20) NOT NULL,
+        meta_key varchar(255) DEFAULT NULL,
+        meta_value longtext DEFAULT NULL,
+        PRIMARY KEY (id),
+        KEY blog_id (blog_id),
+        KEY meta_key (meta_key(191))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;" --path=/var/www/html
 fi
 
 # Ensure all required BuddyPress components are active
@@ -147,6 +381,55 @@ for member_data in "${band_members[@]}"; do
                 wp bp xprofile data set --user-id=$user_id --field-id=$visual_field --value="$visual_style" --path=/var/www/html || true
             fi
             
+            # Check for and set avatar image for the user if available
+            avatar_path="/usr/local/bin/devscripts/assets/${name}.png"
+            if [ -f "$avatar_path" ]; then
+                echo "Setting avatar for $name using $avatar_path"
+                # Create the avatar directory if it doesn't exist
+                mkdir -p /var/www/html/wp-content/uploads/avatars
+                # Copy the avatar to WordPress uploads directory
+                cp "$avatar_path" "/var/www/html/wp-content/uploads/avatars/${name}.png"
+                
+                # Set the avatar using WP-CLI and BuddyPress functions
+                wp eval "
+                // Set BP avatar for user $user_id
+                if (function_exists('bp_core_avatar_handle_upload')) {
+                    // Create avatars directory if needed
+                    \$avatar_dir = WP_CONTENT_DIR . '/uploads/avatars/';
+                    if (!file_exists(\$avatar_dir)) {
+                        mkdir(\$avatar_dir, 0755, true);
+                    }
+                    
+                    // Source file
+                    \$src_file = '/var/www/html/wp-content/uploads/avatars/${name}.png';
+                    
+                    // Use BP's avatar storage system
+                    if (file_exists(\$src_file)) {
+                        // Get the avatar directory for this user
+                        \$avatar_dir = bp_core_avatar_upload_path() . '/avatars/' . $user_id;
+                        if (!file_exists(\$avatar_dir)) {
+                            mkdir(\$avatar_dir, 0755, true);
+                        }
+                        
+                        // Copy to both full and thumb locations
+                        copy(\$src_file, \$avatar_dir . '/avatar-bpfull.png');
+                        copy(\$src_file, \$avatar_dir . '/avatar-bpthumb.png');
+                        
+                        // Update user meta to indicate custom avatar
+                        update_user_meta($user_id, 'bp_avatar_type', 'uploaded');
+                        
+                        echo 'Avatar successfully set for user $user_id (${name})';
+                    } else {
+                        echo 'Avatar file not found at ' . \$src_file;
+                    }
+                } else {
+                    echo 'BuddyPress avatar functions not available';
+                }
+                " --path=/var/www/html || echo "Failed to set avatar for $name"
+            else
+                echo "No avatar image found for $name at $avatar_path"
+            fi
+            
             band_user_ids+=($user_id)
         else
             echo "Error creating user $username"
@@ -163,6 +446,53 @@ for member_data in "${band_members[@]}"; do
                 echo "Updating Ivory's role to author..."
                 wp user set-role "$username" author --path=/var/www/html
             fi
+        fi
+        
+        # Check for and update avatar image for the user if available (even for existing users)
+        avatar_path="/usr/local/bin/devscripts/assets/${name}.png"
+        if [ -f "$avatar_path" ]; then
+            echo "Updating avatar for existing user $name using $avatar_path"
+            # Create the avatar directory if it doesn't exist
+            mkdir -p /var/www/html/wp-content/uploads/avatars
+            # Copy the avatar to WordPress uploads directory
+            cp "$avatar_path" "/var/www/html/wp-content/uploads/avatars/${name}.png"
+            
+            # Set the avatar using WP-CLI and BuddyPress functions
+            wp eval "
+            // Set BP avatar for user $user_id
+            if (function_exists('bp_core_avatar_handle_upload')) {
+                // Create avatars directory if needed
+                \$avatar_dir = WP_CONTENT_DIR . '/uploads/avatars/';
+                if (!file_exists(\$avatar_dir)) {
+                    mkdir(\$avatar_dir, 0755, true);
+                }
+                
+                // Source file
+                \$src_file = '/var/www/html/wp-content/uploads/avatars/${name}.png';
+                
+                // Use BP's avatar storage system
+                if (file_exists(\$src_file)) {
+                    // Get the avatar directory for this user
+                    \$avatar_dir = bp_core_avatar_upload_path() . '/avatars/' . $user_id;
+                    if (!file_exists(\$avatar_dir)) {
+                        mkdir(\$avatar_dir, 0755, true);
+                    }
+                    
+                    // Copy to both full and thumb locations
+                    copy(\$src_file, \$avatar_dir . '/avatar-bpfull.png');
+                    copy(\$src_file, \$avatar_dir . '/avatar-bpthumb.png');
+                    
+                    // Update user meta to indicate custom avatar
+                    update_user_meta($user_id, 'bp_avatar_type', 'uploaded');
+                    
+                    echo 'Avatar successfully updated for existing user $user_id (${name})';
+                } else {
+                    echo 'Avatar file not found at ' . \$src_file;
+                }
+            } else {
+                echo 'BuddyPress avatar functions not available';
+            }
+            " --path=/var/www/html || echo "Failed to update avatar for $name"
         fi
         
         band_user_ids+=($user_id)
@@ -273,6 +603,10 @@ total_members=${#band_user_ids[@]}
 wp db query "UPDATE wp_bp_groups_groupmeta SET meta_value = $total_members WHERE group_id = $group_id AND meta_key = 'total_member_count'" --path=/var/www/html || true
 # If no row exists, insert it
 wp db query "INSERT IGNORE INTO wp_bp_groups_groupmeta (group_id, meta_key, meta_value) VALUES ($group_id, 'total_member_count', $total_members)" --path=/var/www/html || true
+
+# Set the default tab for groups to 'members' so clicking on a group shows the members list
+echo "Setting groups default tab to 'members'..."
+wp option add bp-groups-default-tab 'members' --path=/var/www/html || wp option update bp-groups-default-tab 'members' --path=/var/www/html
 
 # Directly clear all BuddyPress cache entries in the database 
 wp db query "DELETE FROM wp_options WHERE option_name LIKE '%bp%cache%'" --path=/var/www/html || true
@@ -473,11 +807,12 @@ if [ "$existing_posts" -lt "2" ]; then
     fi
     
     echo "Creating tour announcement post..."
-    # Create post with both categories at once
+    # Create post with both categories at once - use a specific slug to avoid conflict with group slug
     tour_id=$(wp post create --post_title="ScriptHammer Announces: The Aether Trail Tour of 1848" \
                    --post_content="$tour_announcement_post_content" \
                    --post_status="publish" \
                    --post_author="$creator_id" \
+                   --post_name="aether-trail-tour-1848" \
                    --post_category="$MUSIC_CAT_ID,$TOUR_CAT_ID" \
                    --porcelain \
                    --path=/var/www/html)

@@ -55,7 +55,16 @@ COPY devscripts/simple-gamification.css /usr/local/bin/devscripts/simple-gamific
 COPY devscripts/simple-gamification.js /usr/local/bin/devscripts/simple-gamification.js
 COPY devscripts/simple-gamification.php /usr/local/bin/devscripts/simple-gamification.php
 COPY devscripts/demo-content.sh /usr/local/bin/devscripts/demo-content.sh
-RUN chmod +x /usr/local/bin/devscripts/demo-content.sh
+COPY devscripts/scripthammer.sh /usr/local/bin/devscripts/scripthammer.sh
+# Copy assets for band member avatars
+COPY devscripts/assets /usr/local/bin/devscripts/assets
+RUN chmod +x /usr/local/bin/devscripts/demo-content.sh /usr/local/bin/devscripts/scripthammer.sh
+
+# Fix BuddyX theme categories template to show all categories
+# We'll create a theme-patching script to be run during setup
+COPY devscripts/theme-patches/ /usr/local/bin/devscripts/theme-patches/
+RUN mkdir -p /var/www/html/wp-content/themes/buddyx/template-parts/content/ && \
+    chmod +x /usr/local/bin/devscripts/theme-patches/*.sh
 
 # Set proper ownership for WordPress files
 RUN chown -R www-data:www-data /var/www/html /usr/src/wordpress

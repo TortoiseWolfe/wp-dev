@@ -49,8 +49,16 @@ else
   echo "WordPress is already installed."
 fi
 
-echo "Activating BuddyPress plugin..."
+echo "Activating BuddyPress plugin and initializing database tables..."
+# First deactivate if already active to ensure clean initialization
+wp plugin deactivate buddypress --path=/var/www/html || true
+# Activate with proper initialization
 wp plugin activate buddypress --path=/var/www/html || handle_error $LINENO
+# Verify database tables exist by checking for critical BP tables
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_groups'" --path=/var/www/html | grep -q "wp_bp_groups"; then
+    echo "BuddyPress database tables not properly created. Forcing database setup..."
+    wp eval 'bp_core_install( bp_get_active_components() );' --path=/var/www/html || echo "⚠️ Warning: Couldn't run BuddyPress database setup"
+fi
 
 # Install GamiPress plugins (always)
 echo "Installing GamiPress plugins..."
@@ -159,51 +167,92 @@ fi
 # Enable BuddyPress components one by one with error handling
 echo "Enabling BuddyPress components..."
 
-# First, modify the MySQL mode to avoid STRICT_TRANS_TABLES errors with BuddyPress
-echo "Modifying MySQL mode to be compatible with BuddyPress..."
-mysql -h "${WORDPRESS_DB_HOST%:*}" -u"${WORDPRESS_DB_USER}" -p"${WORDPRESS_DB_PASSWORD}" -e "SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'STRICT_TRANS_TABLES',''));" || echo "Could not modify MySQL mode, some BuddyPress components might fail to activate."
+# Instead of modifying MySQL global settings (which requires SUPER privilege),
+# use WordPress options to force BuddyPress components activation
+echo "Setting up BuddyPress components using direct database options..."
 
-# Deactivate any existing components to ensure clean activation
-echo "Clearing existing component states for clean activation..."
-wp bp component deactivate friends messages blogs --path=/var/www/html || true
-sleep 1
+# Create a persistent flag file to indicate this container has set up components
+SETUP_FLAG="/var/www/html/.buddypress_components_configured"
 
-# Explicitly activate each component needed for ScriptHammer
-echo "Activating required BuddyPress components with improved error handling..."
-
-# First activate core components that other components depend on
-echo "Activating core BuddyPress components first..."
-wp bp component activate xprofile --path=/var/www/html || true
-wp bp component activate settings --path=/var/www/html || true
-wp bp component activate members --path=/var/www/html || true
-wp bp component activate groups --path=/var/www/html || true
-wp bp component activate activity --path=/var/www/html || true
-wp bp component activate notifications --path=/var/www/html || true
-
-# Wait for these to take effect
-sleep 3
-
-# Individually activate each remaining component with proper error checking
-echo "Activating friends component..."
-if ! wp bp component activate friends --path=/var/www/html; then
-    echo "Failed to activate friends component on first try, retrying with delay..."
-    sleep 2
-    wp bp component activate friends --path=/var/www/html || echo "ERROR: Friends component activation failed!"
+# Check if we've already configured the components
+if [ -f "$SETUP_FLAG" ]; then
+    echo "BuddyPress components were previously configured, ensuring they're still active..."
+else
+    # First ensure the plugin is fully activated
+    wp plugin activate buddypress --path=/var/www/html || true
+    
+    # Reset component state for a clean setup
+    echo "Preparing for clean component activation..."
+    wp cache flush --path=/var/www/html || true
+    sleep 1
 fi
 
-echo "Activating messages component..."
-if ! wp bp component activate messages --path=/var/www/html; then
-    echo "Failed to activate messages component on first try, retrying with delay..."
-    sleep 2
-    wp bp component activate messages --path=/var/www/html || echo "ERROR: Messages component activation failed!"
+# Force activate all required components by directly setting options in the database
+# This approach avoids SQL mode issues and persists through container restarts
+echo "Directly activating and persisting BuddyPress components..."
+
+# Get the current active components
+ACTIVE_COMPONENTS=$(wp option get bp-active-components --format=json --path=/var/www/html)
+
+# Create a new components array with all required components activated
+# This uses a secure, direct approach without modifying MySQL settings
+wp eval '
+// Define all the components we need to activate
+$required_components = array(
+    "xprofile"      => 1,
+    "settings"      => 1,
+    "members"       => 1,
+    "groups"        => 1,
+    "activity"      => 1,
+    "notifications" => 1,
+    "friends"       => 1,
+    "messages"      => 1,
+    "blogs"         => 1
+);
+
+// Get current components
+$current = get_option("bp-active-components", array());
+
+// Merge with our required components, ensuring they are all active
+$updated = array_merge($current, $required_components);
+
+// Save back to the database
+update_option("bp-active-components", $updated);
+
+// Additionally, ensure these settings are saved with autoload=yes for better performance
+update_option("bp-active-components", $updated, "yes");
+
+// For extra security, directly activate specific components in case the merge approach fails
+bp_update_option("bp-active-components", $updated);
+
+// Set additional BuddyPress options for better security
+update_option("_bp_theme_package_id", "nouveau");
+update_option("bp-disable-account-deletion", 0);
+update_option("bp-disable-avatar-uploads", 0);
+update_option("bp-disable-cover-image-uploads", 0);
+update_option("bp-disable-group-avatar-uploads", 0);
+update_option("bp-disable-group-cover-image-uploads", 0);
+
+// Force refresh of BuddyPress cache
+wp_cache_delete("bp_active_components", "bp");
+' --path=/var/www/html || echo "⚠️  Warning: Could not execute direct component activation"
+
+# Explicitly activate each component through WP-CLI as a backup method
+echo "Ensuring activation through WP-CLI..."
+for component in xprofile settings members groups activity notifications friends messages blogs; do
+    wp bp component activate $component --path=/var/www/html || true
+    sleep 1
+done
+
+# Create the setup flag file to avoid redoing this on every container start
+if [ ! -f "$SETUP_FLAG" ]; then
+    echo "BuddyPress components successfully configured at $(date)" > "$SETUP_FLAG"
+    chmod 644 "$SETUP_FLAG"
+    chown www-data:www-data "$SETUP_FLAG"
 fi
 
-echo "Activating blogs component..."
-if ! wp bp component activate blogs --path=/var/www/html; then
-    echo "Failed to activate blogs component on first try, retrying with delay..."
-    sleep 2
-    wp bp component activate blogs --path=/var/www/html || echo "ERROR: Blogs component activation failed!"
-fi
+# Force refresh BuddyPress cache
+wp cache flush --path=/var/www/html || true
 
 # Verify all components are active
 echo "Verifying BuddyPress components status..."

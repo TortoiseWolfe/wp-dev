@@ -1,6 +1,98 @@
 #!/bin/bash
 set -e
 
+# Ensure BuddyPress database tables are properly initialized
+if ! wp db query "SHOW TABLES LIKE 'wp_bp_groups'" --path=/var/www/html | grep -q "wp_bp_groups"; then
+    echo "BuddyPress database tables missing. Forcing proper initialization..."
+    
+    # Create a temporary PHP file to properly initialize BuddyPress
+    cat > /tmp/bp_initialize.php << 'EOT'
+<?php
+// Load WordPress
+require_once('/var/www/html/wp-load.php');
+
+// Check if BuddyPress is active
+if (!function_exists('buddypress')) {
+    echo "BuddyPress not active! Activating...\n";
+    require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+    activate_plugin('buddypress/bp-loader.php');
+}
+
+// Define all required BuddyPress components
+$required_components = array(
+    'xprofile' => 1,
+    'settings' => 1,
+    'members' => 1,
+    'groups' => 1,
+    'activity' => 1,
+    'notifications' => 1,
+    'friends' => 1,
+    'messages' => 1,
+    'blogs' => 1,
+);
+
+// Set the active components in the database
+update_option('bp-active-components', $required_components);
+
+// Create a function to initialize the database tables
+function initialize_buddypress_db() {
+    global $wpdb, $bp;
+    
+    // Load BuddyPress core
+    require_once(WP_PLUGIN_DIR . '/buddypress/bp-core/bp-core-loader.php');
+    
+    // Initialize components to create their tables
+    do_action('bp_core_install');
+    do_action('bp_core_add_caps');
+    
+    // Force reinitialization of specific components
+    foreach (['activity', 'friends', 'groups', 'messages', 'notifications', 'xprofile', 'blogs'] as $component) {
+        $component_dir = WP_PLUGIN_DIR . "/buddypress/bp-{$component}/bp-{$component}-loader.php";
+        if (file_exists($component_dir)) {
+            require_once($component_dir);
+        }
+        do_action("bp_{$component}_install");
+    }
+    
+    // Verify table creation
+    $tables_count = count($wpdb->get_results("SHOW TABLES LIKE 'wp_bp_%'"));
+    echo "Created/verified {$tables_count} BuddyPress tables.\n";
+    
+    // Specifically check for the groups table
+    $groups_table = $wpdb->get_var("SHOW TABLES LIKE 'wp_bp_groups'");
+    echo $groups_table ? "wp_bp_groups table exists: YES\n" : "wp_bp_groups table exists: NO\n";
+}
+
+// Run the initialization
+initialize_buddypress_db();
+
+echo "BuddyPress database initialization completed.\n";
+EOT
+
+    # Execute the initialization script
+    echo "Running BuddyPress initialization script..."
+    php /tmp/bp_initialize.php
+    
+    # Verify the tables were created
+    if ! wp db query "SHOW TABLES LIKE 'wp_bp_groups'" --path=/var/www/html | grep -q "wp_bp_groups"; then
+        echo "❌ ERROR: Failed to create BuddyPress database tables despite initialization attempt."
+        
+        # Try one more approach - install WordPress again to trigger all setup hooks
+        echo "Attempting one final approach - reinstalling WordPress to trigger hooks..."
+        wp core install --url="${WP_SITE_URL}" --title="ScriptHammer.com" \
+           --admin_user="${WP_ADMIN_USER}" --admin_password="${WP_ADMIN_PASSWORD}" \
+           --admin_email="${WP_ADMIN_EMAIL}" --skip-email --path=/var/www/html --skip-plugins
+        
+        # Reactivate BuddyPress
+        wp plugin activate buddypress --path=/var/www/html
+    else
+        echo "✅ BuddyPress database tables created successfully."
+    fi
+    
+    # Remove the temporary file
+    rm -f /tmp/bp_initialize.php
+fi
+
 echo "Starting WordPress development data population..."
 
 # Show usage information if help parameter is provided
