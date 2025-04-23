@@ -100,9 +100,9 @@ docker-compose exec wordpress wp --allow-root plugin list
 
 ### Build & Push
 ```bash
-docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.2 .
+docker build --target production -t ghcr.io/tortoisewolfe/wp-dev:v0.1.4 .
 echo $GITHUB_TOKEN | docker login ghcr.io -u tortoisewolfe --password-stdin
-docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.2
+docker push ghcr.io/tortoisewolfe/wp-dev:v0.1.4
 ```
 
 ### Deploy

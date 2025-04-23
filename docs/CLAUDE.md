@@ -108,7 +108,7 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
 - Security-hardened production image with Apache security configurations
 - Nginx reverse proxy with SSL termination for HTTPS support
 - Versioned image tagging for reliable deployment and rollback
-- Container Registry: ghcr.io/tortoisewolfe/wp-dev:v0.1.1
+- Container Registry: ghcr.io/tortoisewolfe/wp-dev:v0.1.4
 - Reduced attack surface with minimal packages and proper permissions
 - Health checks for container orchestration reliability
 
@@ -118,7 +118,7 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
 - COMPLETED: Tutorial completion tracking and progress display
 - COMPLETED: Achievements and points system for users
 - COMPLETED: Documentation consolidation in readme.md
-- IN PROGRESS: Allyship curriculum implementation
+- COMPLETED: Allyship curriculum implementation
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
 
@@ -182,8 +182,9 @@ sudo -E docker-compose up -d
 
 ## 📝 Dev Notes for Pair Programming
 
-- Validate presence of `GITHUB_TOKEN` early in `setup-secrets.sh` and deployment scripts; fail fast with a clear error if missing.
-- Add `set -euo pipefail` at the top of all Bash scripts to enforce strict error handling.
+- ✅ Validate presence of `GITHUB_TOKEN` early in `setup-secrets.sh` and deployment scripts; fail fast with a clear error if missing.
+- ✅ Added admin credentials display script: `scripts/dev/show-admin-creds.sh`
+- ✅ Set -euo pipefail at the top of all Bash scripts to enforce strict error handling.
 - Create a unified helper script (e.g., `scripts/deploy.sh`) or Makefile target encapsulating:
   - `source ./scripts/setup-secrets.sh`
   - GHCR login via `docker login`
