@@ -72,7 +72,8 @@ The WordPress setup in WSL (Windows Subsystem for Linux) has been enhanced:
 ### For Local Development Environment:
 1. Run `source ./scripts/dev/setup-local-dev.sh` to generate secure local development credentials
    - GamiPress plugin is always installed automatically
-   - You'll be asked if you want to skip demo content installation
+   - Demo content is skipped by default to focus on band content only
+   - The metronome/drum machine app for the band is enabled by default with CREATE_BAND_METRONOME=true
    - In WSL, the script automatically detects and uses your WSL IP address for proper permalink functionality
 2. Run `sudo -E docker-compose up -d wordpress wp-setup db` to start dev containers
 3. Access WordPress at:
@@ -118,7 +119,8 @@ If you encounter "Error response from daemon: Head: unauthorized" or "Error resp
 - COMPLETED: Tutorial completion tracking and progress display
 - COMPLETED: Achievements and points system for users
 - COMPLETED: Documentation consolidation in readme.md
-- COMPLETED: Allyship curriculum implementation
+- COMPLETED: ScriptHammer band content with drum machine
+- COMPLETED: Decoupling of band content from demo content
 - Permalinks set to /%postname%/ format for clean URLs
 - All gamification elements embedded directly into the curriculum page
 
@@ -141,8 +143,16 @@ Two category display issues have been fixed:
    - Adding a CSS/JS fix to `simple-gamification.php` plugin
    - The fix ensures all categories in a post are displayed, not just the first one
    - This plugin-based approach survives theme updates (following WordPress best practices)
+   - Fixed issue where categories weren't showing on the home page by:
+     - Ensuring proper activation of the directory version of simple-gamification plugin
+     - Using `article[id^="post-"]` selector to target posts on both single and home pages
+     - Updating setup.sh and rebuild-dev.sh to prioritize the directory plugin version
 
-Note: The second issue is a limitation in the BuddyX theme's template, specifically in `entry_categories.php` which contains a `break` after displaying the first category.
+Note: The BuddyX theme has a limitation in its template, specifically in `entry_categories.php` which contains a `break` after displaying the first category. Our JS-based fix in the simple-gamification plugin overcomes this limitation on all pages.
+
+### Band Member Profile Pictures
+
+The devscripts/assets/ directory contains profile pictures for each band member (Brass.png, Chops.png, Crash.png, Form.png, Ivory.png, Reed.png, Verse.png). These should be used in the individual band member introduction posts to maintain visual consistency across the site.
 
 1. Script `/devscripts/scripthammer.sh` creates users and adds them to a BuddyPress group
 2. Backend verification shows 12 confirmed members in database table `wp_bp_groups_members`
@@ -615,11 +625,32 @@ sudo -E docker-compose up -d
 - [ ] Document environment-specific configurations
 - [ ] Add proper environment detection in scripts
 
-## Curricula
+## Content Structure
 
-The environment contains two distinct curricula with separate content but shared gamification mechanics:
+The environment can be configured to focus on band content or include additional demo content:
 
-### 1. BuddyPress Tutorial Curriculum
+### 1. ScriptHammer Band Content
+
+The primary focus is the ScriptHammer band content, which includes:
+
+#### Band Content Components
+- **Band Members**: Seven musician profiles (Ivory, Crash, Chops, Reed, Brass, Verse, Form)
+- **BuddyPress Group**: ScriptHammer band group with all members
+- **Blog Posts**: The band's origin story and tour announcements
+- **Interactive Drum Machine**: A functional metronome/drum sequencer for band practice
+  - Different drum patterns (Rock, Disco, Hip Hop, Jazz, Waltz)
+  - Visual beat programming interface
+  - Working audio using Web Audio API
+  - Volume controls for each instrument
+
+#### Metronome Configuration
+- The drum machine is enabled by default with `CREATE_BAND_METRONOME=true` variable
+- Can be toggled using the `--with-metronome` flag in scripthammer.sh
+- Implemented as a WordPress MU-plugin for automatic loading
+- Accessible via the "ScriptHammer Drum Machine" page
+- Used by band members for practice and composition
+
+### 2. BuddyPress Tutorial Curriculum (Optional)
 
 A comprehensive tutorial series on building social networks with WordPress, BuddyPress, and BuddyX theme.
 
@@ -628,7 +659,7 @@ A comprehensive tutorial series on building social networks with WordPress, Budd
 - **Group Management**: Creating groups and setting up discussions
 - **BuddyX Theme**: Theme introduction and customization
 
-### 2. Allyship Curriculum
+### 3. Allyship Curriculum (Optional)
 
 Educational modules focused on allyship in the workplace with interactive learning elements.
 
@@ -637,6 +668,11 @@ Educational modules focused on allyship in the workplace with interactive learni
 - **Interactive Elements**: Video, reflection prompts, graphic novella, scenarios
 - **Assessment Components**: Quiz scenarios with feedback and commitment builder
 - **Action Planning**: Tools for making and tracking allyship commitments
+
+### Content Configuration
+- By default, only the ScriptHammer band content is created (demo content is skipped)
+- Optional demo content (Allyship curriculum, philosophical pages) can be enabled by setting `SKIP_DEMO_CONTENT=false`
+- This separation allows for a focused band site experience without unrelated content
 
 ## Gamification
 

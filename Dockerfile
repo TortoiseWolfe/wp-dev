@@ -56,6 +56,8 @@ COPY devscripts/simple-gamification.js /usr/local/bin/devscripts/simple-gamifica
 COPY devscripts/simple-gamification.php /usr/local/bin/devscripts/simple-gamification.php
 COPY devscripts/demo-content.sh /usr/local/bin/devscripts/demo-content.sh
 COPY devscripts/scripthammer.sh /usr/local/bin/devscripts/scripthammer.sh
+COPY devscripts/metronome-app.php /usr/local/bin/devscripts/metronome-app.php
+COPY devscripts/metronome-app /usr/local/bin/devscripts/metronome-app
 # Copy assets for band member avatars
 COPY devscripts/assets /usr/local/bin/devscripts/assets
 RUN chmod +x /usr/local/bin/devscripts/demo-content.sh /usr/local/bin/devscripts/scripthammer.sh
@@ -136,9 +138,13 @@ RUN a2enmod rewrite
 COPY scripts/ /usr/local/bin/scripts/
 RUN chmod +x /usr/local/bin/scripts/*.sh /usr/local/bin/scripts/*/*.sh
 
+# Ensure React build script is executable
+RUN if [ -f /usr/local/bin/scripts/dev/build-react-app.sh ]; then chmod +x /usr/local/bin/scripts/dev/build-react-app.sh; fi
+
 # Copy the devscripts directory
 COPY devscripts /usr/local/bin/devscripts
-RUN chmod +x /usr/local/bin/devscripts/demo-content.sh
+RUN chmod +x /usr/local/bin/devscripts/demo-content.sh /usr/local/bin/devscripts/scripthammer.sh && \
+    chmod 644 /usr/local/bin/devscripts/reactpress-placeholder.php
 
 # Switch to non‑root user provided by the official WordPress image
 USER www-data

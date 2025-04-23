@@ -1,6 +1,10 @@
 #!/bin/bash
 # Local development setup script
 
+# Get the directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
+
 # Generate secure random passwords for local development
 ROOT_PW=$(openssl rand -base64 20 | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
 DB_PW=$(openssl rand -base64 20 | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
@@ -17,15 +21,10 @@ export WP_ADMIN_EMAIL="admin@example.com"
 INSTALL_GAMIPRESS=true
 export INSTALL_GAMIPRESS="true"
 
-# Ask if demo content should be skipped
-read -p "Skip demo content installation? (y/n): " skip_demo
-if [[ "$skip_demo" =~ ^[Yy] ]]; then
-  SKIP_DEMO=true
-  export SKIP_DEMO_CONTENT="true"
-else
-  SKIP_DEMO=false
-  export SKIP_DEMO_CONTENT="false"
-fi
+# Default to skipping demo content (focus on band content)
+SKIP_DEMO=true
+export SKIP_DEMO_CONTENT="true"
+echo "Demo content installation will be skipped (focusing on band content only)."
 
 # Update .env file with the development secrets
 sed -i.bak "/# Added automatically by/d" .env
@@ -61,6 +60,24 @@ BUDDYPRESS_ACTIVATE_MESSAGES=true
 BUDDYPRESS_ACTIVATE_BLOGS=true
 BUDDYPRESS_ACTIVATE_SETTINGS=true
 EOF
+
+# Configure ScriptHammer options
+echo "Setting up ScriptHammer band integration..."
+if [ -f "$PROJECT_ROOT/devscripts/metronome-app.php" ]; then
+  echo "✅ Metronome app plugin found"
+  
+  # Configure ScriptHammer band settings
+  sed -i.bak "/^CREATE_BAND_METRONOME=/d" .env
+  echo "CREATE_BAND_METRONOME=true" >> .env
+  echo "ScriptHammer band metronome enabled by default"
+else
+  # Create a warning if the plugin file is missing
+  echo "❌ WARNING: Metronome app plugin not found in $PROJECT_ROOT/devscripts/"
+  echo "❌ This will cause the integration to fail. Please check your repository."
+  # Still enable it so the scripts try to find it later
+  sed -i.bak "/^CREATE_BAND_METRONOME=/d" .env
+  echo "CREATE_BAND_METRONOME=true" >> .env
+fi
 
 echo "----------------------------------------"
 echo "🔐 Local development passwords generated:"

@@ -11,6 +11,33 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Define plugin path and URL constants
+define('SIMPLE_GAMIFICATION_PATH', plugin_dir_path(__FILE__));
+define('SIMPLE_GAMIFICATION_URL', plugin_dir_url(__FILE__));
+
+// Enqueue required scripts and styles
+function simple_gamification_enqueue_scripts() {
+    // Register and enqueue the CSS file
+    wp_register_style(
+        'simple-gamification-css',
+        SIMPLE_GAMIFICATION_URL . 'simple-gamification.css',
+        array(),
+        '1.0.0'
+    );
+    wp_enqueue_style('simple-gamification-css');
+    
+    // Register and enqueue the JS file
+    wp_register_script(
+        'simple-gamification-js',
+        SIMPLE_GAMIFICATION_URL . 'simple-gamification.js',
+        array('jquery'),
+        '1.0.0',
+        true
+    );
+    wp_enqueue_script('simple-gamification-js');
+}
+add_action('wp_enqueue_scripts', 'simple_gamification_enqueue_scripts');
+
 // Ensure BuddyPress components are always active
 add_action('plugins_loaded', function() {
     // Only run this if BuddyPress is active
@@ -269,7 +296,7 @@ add_action('wp_head', function() {
         }
     </style>
     <script>
-        // More aggressive fix - actually add all categories to the post display
+        // Fix to add all categories to post display on both single and archive pages
         document.addEventListener('DOMContentLoaded', function() {
             // Function to get all categories for a post
             async function fetchCategories(postId) {
@@ -300,25 +327,19 @@ add_action('wp_head', function() {
                 }
             }
             
-            // Add all categories to the post header
-            const addAllCategories = async () => {
-                // Check if we're on a single post page
-                const postContainer = document.querySelector('article.post');
-                if (!postContainer) return;
-                
+            // Process a single post by ID and container
+            async function processPost(postContainer) {
                 // Get the post ID
                 const postId = postContainer.id.replace('post-', '');
                 if (!postId) return;
                 
-                // Get categories
-                const categories = await fetchCategories(postId);
-                if (!categories || categories.length <= 1) return;
-                
-                // Find the category container
-                const categoryContainer = document.querySelector('.post-meta-category');
+                // Find the category container within this post
+                const categoryContainer = postContainer.querySelector('.post-meta-category');
                 if (!categoryContainer) return;
                 
-                console.log('Found categories:', categories);
+                // Get categories for this post
+                const categories = await fetchCategories(postId);
+                if (!categories || categories.length <= 1) return;
                 
                 // Clear existing content and add all categories
                 categoryContainer.innerHTML = '';
@@ -334,19 +355,34 @@ add_action('wp_head', function() {
                     `;
                     categoryContainer.appendChild(categoryItem);
                 });
+            }
+            
+            // Process all posts on the page
+            const processAllPosts = () => {
+                // Select all article elements with class containing "post"
+                // This will work for both single posts and posts in archives/home page
+                const postContainers = document.querySelectorAll('article[id^="post-"]');
+                
+                if (postContainers.length === 0) return;
+                
+                // Process each post
+                postContainers.forEach(postContainer => {
+                    processPost(postContainer);
+                });
             };
             
-            // Make it run repeatedly to catch any late loading situations
+            // Initial run
+            processAllPosts();
+            
+            // Run again after a delay to catch any late loading elements
             setTimeout(() => {
-                addAllCategories();
+                processAllPosts();
             }, 500);
             
+            // One more time with a longer delay
             setTimeout(() => {
-                addAllCategories();
+                processAllPosts();
             }, 1000);
-            
-            // Run the function immediately
-            addAllCategories();
         });
     </script>
     <?php

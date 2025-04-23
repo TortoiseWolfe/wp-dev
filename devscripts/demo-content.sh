@@ -199,6 +199,9 @@ echo "All required BuddyPress components are now verified and activated!"
 echo "Confirming BuddyPress components final status:"
 wp bp component list --path=/var/www/html
 
+# Note: Metronome app is now handled in the scripthammer.sh script
+# This ensures it's tied directly to the band content rather than general demo content
+
 echo "Creating ScriptHammer band members..."
 
 # Define ScriptHammer band members data
@@ -370,36 +373,43 @@ else
 fi
 
 echo "Setting up post categories..."
-# Categories for posts
-categories=(
-    "Philosophy" 
-    "Literature"
-    "History"
-    "Classical Studies"
-    "Roman Culture"
-)
+# Skip Latin categories if we're skipping all demo content
+if $SKIP_DEMO; then
+    echo "Skipping creation of Latin categories..."
+    # Create an empty array since we won't need category IDs
+    category_ids=()
+else
+    # Categories for posts
+    categories=(
+        "Philosophy" 
+        "Literature"
+        "History"
+        "Classical Studies"
+        "Roman Culture"
+    )
 
-# Create categories if they don't exist and store their IDs
-category_ids=()
-for category in "${categories[@]}"; do
-    # Generate a proper slug from the category name
-    slug=$(echo "$category" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-    
-    # Check if category exists
-    existing_cat_id=$(wp term list category --name="$category" --field=term_id --path=/var/www/html)
-    
-    if [ -n "$existing_cat_id" ]; then
-        # Use existing category
-        cat_id=$existing_cat_id
-        echo "Using existing category: $category with ID: $cat_id"
-    else
-        # Create new category
-        cat_id=$(wp term create category "$category" --slug="$slug" --porcelain --path=/var/www/html)
-        echo "Created category: $category with ID: $cat_id and slug: $slug"
-    fi
-    
-    category_ids+=("$cat_id")
-done
+    # Create categories if they don't exist and store their IDs
+    category_ids=()
+    for category in "${categories[@]}"; do
+        # Generate a proper slug from the category name
+        slug=$(echo "$category" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+        
+        # Check if category exists
+        existing_cat_id=$(wp term list category --name="$category" --field=term_id --path=/var/www/html)
+        
+        if [ -n "$existing_cat_id" ]; then
+            # Use existing category
+            cat_id=$existing_cat_id
+            echo "Using existing category: $category with ID: $cat_id"
+        else
+            # Create new category
+            cat_id=$(wp term create category "$category" --slug="$slug" --porcelain --path=/var/www/html)
+            echo "Created category: $category with ID: $cat_id and slug: $slug"
+        fi
+        
+        category_ids+=("$cat_id")
+    done
+fi
 
 echo "Creating example posts..."
 # Check if we should skip demo posts
@@ -544,16 +554,20 @@ done
 fi
 
 echo "Creating sample pages..."
-# Create philosophical pages
-page_titles=(
-    "Philosophical Categories" 
-    "Historical Timeline" 
-    "Major Works" 
-    "Ethical Systems" 
-    "Symposium Registration"
-)
+# Skip philosophical pages if we're skipping all demo content
+if $SKIP_DEMO; then
+    echo "Skipping philosophical pages creation (dead latin content)..."
+else
+    # Create philosophical pages
+    page_titles=(
+        "Philosophical Categories" 
+        "Historical Timeline" 
+        "Major Works" 
+        "Ethical Systems" 
+        "Symposium Registration"
+    )
 
-page_contents=(
+    page_contents=(
     "<h2>Major Philosophical Categories</h2>
 
 <h3>Metaphysics</h3>
@@ -676,12 +690,18 @@ Posits that ethical rules are inherent in nature and can be discovered through r
 <p>Register by August 1st for early bird pricing. All participants will receive a collection of selected readings and access to recorded sessions.</p>"
 )
 
-for i in {1..5}; do
-    page_title="${page_titles[$i-1]}"
-    page_content="${page_contents[$i-1]}"
-    
-    wp post create --post_type=page --post_title="$page_title" --post_content="$page_content" --post_status="publish" --path=/var/www/html
-done
+# Only create these pages if we're not skipping demo content
+if ! $SKIP_DEMO; then
+    for i in {1..5}; do
+        page_title="${page_titles[$i-1]}"
+        page_content="${page_contents[$i-1]}"
+        
+        wp post create --post_type=page --post_title="$page_title" --post_content="$page_content" --post_status="publish" --path=/var/www/html
+    done
+    echo "Created philosophical pages."
+else
+    echo "Skipped creating philosophical pages (dead latin content)."
+fi
 
 echo "Creating messages to admin..."
 # Get admin user ID (usually 1)
@@ -866,25 +886,37 @@ echo "Creating tutorial content for BuddyPress and BuddyX..."
 # Permalinks already set at beginning of script
 
 # Create main tutorial category and subcategories first so we have the IDs
-echo "Creating tutorial categories..."
-main_cat_id=$(wp term create category "BuddyPress Tutorials" --slug="buddypress-tutorials" --porcelain --path=/var/www/html)
-echo "Created main tutorial category with ID: $main_cat_id"
+# Only if we're not skipping demo content
+if $SKIP_DEMO; then
+    echo "Skipping tutorial categories creation..."
+    # Set empty values for the category IDs
+    main_cat_id=""
+    getting_started_id=""
+    group_management_id=""
+    member_management_id=""
+    activity_streams_id=""
+    buddyx_theme_id=""
+else
+    echo "Creating tutorial categories..."
+    main_cat_id=$(wp term create category "BuddyPress Tutorials" --slug="buddypress-tutorials" --porcelain --path=/var/www/html)
+    echo "Created main tutorial category with ID: $main_cat_id"
 
-# Create subcategories
-getting_started_id=$(wp term create category "Getting Started" --slug="getting-started" --parent=$main_cat_id --porcelain --path=/var/www/html)
-echo "Created 'Getting Started' subcategory with ID: $getting_started_id"
+    # Create subcategories
+    getting_started_id=$(wp term create category "Getting Started" --slug="getting-started" --parent=$main_cat_id --porcelain --path=/var/www/html)
+    echo "Created 'Getting Started' subcategory with ID: $getting_started_id"
 
-group_management_id=$(wp term create category "Group Management" --slug="group-management" --parent=$main_cat_id --porcelain --path=/var/www/html)
-echo "Created 'Group Management' subcategory with ID: $group_management_id"
+    group_management_id=$(wp term create category "Group Management" --slug="group-management" --parent=$main_cat_id --porcelain --path=/var/www/html)
+    echo "Created 'Group Management' subcategory with ID: $group_management_id"
 
-member_management_id=$(wp term create category "Member Management" --slug="member-management" --parent=$main_cat_id --porcelain --path=/var/www/html)
-echo "Created 'Member Management' subcategory with ID: $member_management_id"
+    member_management_id=$(wp term create category "Member Management" --slug="member-management" --parent=$main_cat_id --porcelain --path=/var/www/html)
+    echo "Created 'Member Management' subcategory with ID: $member_management_id"
 
-activity_streams_id=$(wp term create category "Activity Streams" --slug="activity-streams" --parent=$main_cat_id --porcelain --path=/var/www/html)
-echo "Created 'Activity Streams' subcategory with ID: $activity_streams_id"
+    activity_streams_id=$(wp term create category "Activity Streams" --slug="activity-streams" --parent=$main_cat_id --porcelain --path=/var/www/html)
+    echo "Created 'Activity Streams' subcategory with ID: $activity_streams_id"
 
-buddyx_theme_id=$(wp term create category "BuddyX Theme" --slug="buddyx-theme" --parent=$main_cat_id --porcelain --path=/var/www/html)
-echo "Created 'BuddyX Theme' subcategory with ID: $buddyx_theme_id"
+    buddyx_theme_id=$(wp term create category "BuddyX Theme" --slug="buddyx-theme" --parent=$main_cat_id --porcelain --path=/var/www/html)
+    echo "Created 'BuddyX Theme' subcategory with ID: $buddyx_theme_id"
+fi
 
 # IMPORTANT: Use plugin-based gamification system ONLY - do not add gamification code directly to posts
 echo "Preparing to create tutorial content (gamification will be handled by plugin only)..."
@@ -1801,19 +1833,23 @@ wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post
 
 echo "Tutorial content for BuddyPress and BuddyX created successfully!"
 
-# Create Allyship System
-echo "Setting up Allyship System..."
+# Create Allyship System only if not skipping demo content
+if ! $SKIP_DEMO; then
+    echo "Setting up Allyship System..."
 
-# Create directory for Allyship System
-mkdir -p /var/www/html/wp-content/plugins/allyship-system/assets
+    # Create directory for Allyship System
+    mkdir -p /var/www/html/wp-content/plugins/allyship-system/assets
 
-# Copy the Allyship System files
-cp /usr/local/bin/devscripts/ally-content/allyship-system.php /var/www/html/wp-content/plugins/allyship-system/allyship-system.php
+    # Copy the Allyship System files
+    cp /usr/local/bin/devscripts/ally-content/allyship-system.php /var/www/html/wp-content/plugins/allyship-system/allyship-system.php
 
-# Setup Allyship System
-wp eval 'require_once(WP_CONTENT_DIR . "/plugins/allyship-system/allyship-system.php"); setup_allyship_system();' --path=/var/www/html || echo "Failed to set up Allyship System"
+    # Setup Allyship System
+    wp eval 'require_once(WP_CONTENT_DIR . "/plugins/allyship-system/allyship-system.php"); setup_allyship_system();' --path=/var/www/html || echo "Failed to set up Allyship System"
 
-echo "Allyship System setup complete!"
+    echo "Allyship System setup complete!"
+else
+    echo "Skipping Allyship System setup (focus on band content only)."
+fi
 # endregion: TUTORIAL CONTENT CREATION
 
 # Add the Tutorial Course Curriculum page to the menu

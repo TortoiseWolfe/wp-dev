@@ -84,11 +84,50 @@ fi
 
 # Copy the simple-gamification.php to plugins directory
 if [ -f "/usr/local/bin/devscripts/simple-gamification.php" ]; then
-    cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-gamification.php
+    echo "Installing simple-gamification plugin as a directory..."
+    
+    # Create plugin directory
+    mkdir -p /var/www/html/wp-content/plugins/simple-gamification
+    
+    # Copy the PHP file
+    cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php
+    chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php
+    chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php
+    
+    # Copy the JS file if it exists
+    if [ -f "/usr/local/bin/devscripts/simple-gamification.js" ]; then
+        cp /usr/local/bin/devscripts/simple-gamification.js /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js
+        chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js
+        chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js
+        echo "✅ Added JS file to simple-gamification plugin"
+    else
+        echo "⚠️ Warning: simple-gamification.js not found in devscripts"
+    fi
+    
+    # Copy the CSS file if it exists
+    if [ -f "/usr/local/bin/devscripts/simple-gamification.css" ]; then
+        cp /usr/local/bin/devscripts/simple-gamification.css /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css
+        chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css
+        chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css
+        echo "✅ Added CSS file to simple-gamification plugin"
+    else
+        echo "⚠️ Warning: simple-gamification.css not found in devscripts"
+    fi
+    
+    # Also install as single file for backward compatibility
+    echo "Also installing as single file for backward compatibility..."
+    cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/
     chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification.php
     chmod 644 /var/www/html/wp-content/plugins/simple-gamification.php
-    wp plugin activate simple-gamification --path=/var/www/html || echo "Warning: Failed to activate simple-gamification plugin"
-    echo "Simple gamification plugin installed and activated"
+    
+    # Activate the plugin (prioritize the directory version, then try the single file version)
+    wp plugin activate simple-gamification/simple-gamification --path=/var/www/html || wp plugin activate simple-gamification --path=/var/www/html || echo "Warning: Failed to activate simple-gamification plugin"
+    echo "Simple gamification plugin installed and activated with all assets"
+    
+    # Verify the plugin is loaded
+    echo "Verifying simple-gamification plugin is active..."
+    wp plugin is-active simple-gamification/simple-gamification --path=/var/www/html && echo "✅ Directory plugin is active" || \
+    (wp plugin is-active simple-gamification --path=/var/www/html && echo "✅ Single file plugin is active" || echo "❌ Plugin failed to activate")
 else
     echo "Warning: simple-gamification.php not found in devscripts"
 fi
@@ -100,6 +139,39 @@ wp plugin list --path=/var/www/html | grep -E 'gamipress|simple-gamification'
 # Install and activate BuddyX theme and recommended plugins
 echo "Activating BuddyX theme and installing recommended plugins..."
 wp theme activate buddyx --path=/var/www/html || handle_error $LINENO
+
+# Install the Metronome app plugin
+echo "Installing Metronome app plugin..."
+if [ -f "/usr/local/bin/devscripts/metronome-app.php" ]; then
+  METRONOME_FILE="/usr/local/bin/devscripts/metronome-app.php"
+  echo "✅ Found metronome-app.php"
+else
+  echo "❌ Metronome app plugin not found in devscripts"
+  exit 1
+fi
+
+# Create the mu-plugins directory if it doesn't exist
+if [ ! -d "/var/www/html/wp-content/mu-plugins" ]; then
+  mkdir -p /var/www/html/wp-content/mu-plugins
+  chown www-data:www-data /var/www/html/wp-content/mu-plugins
+fi
+
+# Copy the metronome app to mu-plugins for automatic loading
+cp "$METRONOME_FILE" /var/www/html/wp-content/mu-plugins/metronome-app.php
+chown www-data:www-data /var/www/html/wp-content/mu-plugins/metronome-app.php
+chmod 644 /var/www/html/wp-content/mu-plugins/metronome-app.php
+
+# Force WordPress to recognize the mu-plugin by touching the file
+touch /var/www/html/wp-content/mu-plugins/metronome-app.php
+
+# Verify the shortcode is registered
+if grep -q "add_shortcode.*scripthammer_react_app" /var/www/html/wp-content/mu-plugins/metronome-app.php; then
+  echo "✅ Metronome app shortcode [scripthammer_react_app] registered"
+else
+  echo "❌ Metronome app shortcode not found in the plugin file"
+fi
+
+echo "✅ Metronome app plugin installed to mu-plugins"
 
 # Install BuddyX recommended plugins with improved handling
 echo "Installing and activating recommended plugins for BuddyX theme..."
@@ -277,23 +349,18 @@ fi
 echo "Final BuddyPress components status:"
 wp bp component list --path=/var/www/html
 
-# Check for demo content flag and run the script if not skipped
-if [ "${SKIP_DEMO_CONTENT}" != "true" ]; then
-  echo "Creating FULL demo content (users, posts, groups, tutorials)..."
-  /usr/local/bin/devscripts/demo-content.sh
-else
-  echo "Skipping random demo content, but still creating tutorial content..."
-  # Still create tutorial content even when skipping demo content
-  /usr/local/bin/devscripts/demo-content.sh --skip-all
-fi
-
-# Run the ScriptHammer band setup script to create band members, group, and Ivory's posts
-echo "Creating ScriptHammer band members and group..."
+# Always create ScriptHammer band content first (the important part)
+echo "Creating ScriptHammer band content (members, group, metronome)..."
 if [ -x /usr/local/bin/devscripts/scripthammer.sh ]; then
   # Ensure script is executable
   chmod +x /usr/local/bin/devscripts/scripthammer.sh
-  # Run the script
-  /usr/local/bin/devscripts/scripthammer.sh
+  
+  # Run the script with metronome flag if enabled
+  if [[ "${CREATE_BAND_METRONOME:-true}" == "true" ]]; then
+    /usr/local/bin/devscripts/scripthammer.sh --with-metronome
+  else
+    /usr/local/bin/devscripts/scripthammer.sh
+  fi
   
   # Verify the group was created
   if wp bp group get scripthammer --path=/var/www/html > /dev/null 2>&1; then
@@ -303,6 +370,17 @@ if [ -x /usr/local/bin/devscripts/scripthammer.sh ]; then
   fi
 else
   echo "⚠️ WARNING: scripthammer.sh script not found or not executable"
+fi
+
+# Check for demo content flag and run the script if not skipped
+# This is separate from the band content that is always created
+if [ "${SKIP_DEMO_CONTENT}" != "true" ]; then
+  echo "Creating additional demo content (users, posts, groups, tutorials)..."
+  /usr/local/bin/devscripts/demo-content.sh
+else
+  echo "Skipping additional demo content, but still creating tutorial content..."
+  # Still create tutorial content even when skipping demo content
+  /usr/local/bin/devscripts/demo-content.sh --skip-all
 fi
 
 echo "Content creation process started in background - it may take a few minutes to complete."
