@@ -10,11 +10,15 @@ echo ""
 echo "⚠️  WARNING: This will DELETE ALL your WordPress data and start fresh!"
 echo "================================"
 
-# Ask for confirmation
-read -p "Are you sure you want to continue? (y/n): " confirm
-if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-  echo "Rebuild cancelled."
-  exit 0
+# Check for --yes flag or ask for confirmation
+if [[ "$1" == "--yes" || "$1" == "-y" ]]; then
+  echo "Proceeding with rebuild (--yes flag provided)..."
+else
+  read -p "Are you sure you want to continue? (y/n): " confirm
+  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+    echo "Rebuild cancelled."
+    exit 0
+  fi
 fi
 
 # Current directory
@@ -66,42 +70,8 @@ docker-compose exec wordpress bash -c "
   wp eval 'if (!function_exists(\"render_scripthammer_react_placeholder\")) { include_once(\"/var/www/html/wp-content/mu-plugins/metronome-app.php\"); echo \"Metronome app loaded manually\"; }' --path=/var/www/html
 "
 
-# Now also install the simple-gamification plugin correctly
-echo "Installing simple-gamification plugin with proper directory structure..."
-docker-compose exec wordpress bash -c "
-  # Create plugin directory
-  mkdir -p /var/www/html/wp-content/plugins/simple-gamification && \
-  
-  # Copy the PHP file
-  cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php && \
-  chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php && \
-  
-  # Copy the JS file if it exists
-  if [ -f '/usr/local/bin/devscripts/simple-gamification.js' ]; then
-    cp /usr/local/bin/devscripts/simple-gamification.js /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js && \
-    chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js && \
-    echo '✅ Added JS file to simple-gamification plugin';
-  else
-    echo '⚠️ Warning: simple-gamification.js not found';
-  fi && \
-  
-  # Copy the CSS file if it exists
-  if [ -f '/usr/local/bin/devscripts/simple-gamification.css' ]; then
-    cp /usr/local/bin/devscripts/simple-gamification.css /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css && \
-    chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css && \
-    echo '✅ Added CSS file to simple-gamification plugin';
-  else
-    echo '⚠️ Warning: simple-gamification.css not found';
-  fi && \
-  
-  # Set proper ownership
-  chown -R www-data:www-data /var/www/html/wp-content/plugins/simple-gamification && \
-  
-  # Activate the plugin (prioritize directory version)
-  wp plugin activate simple-gamification/simple-gamification --path=/var/www/html || \
-  wp plugin activate simple-gamification --path=/var/www/html && \
-  echo '✅ Simple gamification plugin installed and activated'
-"
+# Simple gamification has been removed
+echo "Simple gamification plugin has been removed from this installation."
   
 # Also run the React app build script if we want to build the full React app
 # echo "Building React metronome app (uncomment when ready for production)..."

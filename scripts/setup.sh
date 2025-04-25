@@ -74,63 +74,8 @@ else
     wp plugin install gamipress-buddypress-integration --activate --path=/var/www/html || echo "Warning: Could not install GamiPress-BuddyPress integration"
 fi
 
-# Install simple-gamification plugin
-echo "Installing simple-gamification plugin..."
-# Create plugins directory if it doesn't exist
-if [ ! -d "/var/www/html/wp-content/plugins" ]; then
-    mkdir -p /var/www/html/wp-content/plugins
-    chown www-data:www-data /var/www/html/wp-content/plugins
-fi
-
-# Copy the simple-gamification.php to plugins directory
-if [ -f "/usr/local/bin/devscripts/simple-gamification.php" ]; then
-    echo "Installing simple-gamification plugin as a directory..."
-    
-    # Create plugin directory
-    mkdir -p /var/www/html/wp-content/plugins/simple-gamification
-    
-    # Copy the PHP file
-    cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php
-    chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php
-    chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.php
-    
-    # Copy the JS file if it exists
-    if [ -f "/usr/local/bin/devscripts/simple-gamification.js" ]; then
-        cp /usr/local/bin/devscripts/simple-gamification.js /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js
-        chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js
-        chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.js
-        echo "✅ Added JS file to simple-gamification plugin"
-    else
-        echo "⚠️ Warning: simple-gamification.js not found in devscripts"
-    fi
-    
-    # Copy the CSS file if it exists
-    if [ -f "/usr/local/bin/devscripts/simple-gamification.css" ]; then
-        cp /usr/local/bin/devscripts/simple-gamification.css /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css
-        chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css
-        chmod 644 /var/www/html/wp-content/plugins/simple-gamification/simple-gamification.css
-        echo "✅ Added CSS file to simple-gamification plugin"
-    else
-        echo "⚠️ Warning: simple-gamification.css not found in devscripts"
-    fi
-    
-    # Also install as single file for backward compatibility
-    echo "Also installing as single file for backward compatibility..."
-    cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/
-    chown www-data:www-data /var/www/html/wp-content/plugins/simple-gamification.php
-    chmod 644 /var/www/html/wp-content/plugins/simple-gamification.php
-    
-    # Activate the plugin (prioritize the directory version, then try the single file version)
-    wp plugin activate simple-gamification/simple-gamification --path=/var/www/html || wp plugin activate simple-gamification --path=/var/www/html || echo "Warning: Failed to activate simple-gamification plugin"
-    echo "Simple gamification plugin installed and activated with all assets"
-    
-    # Verify the plugin is loaded
-    echo "Verifying simple-gamification plugin is active..."
-    wp plugin is-active simple-gamification/simple-gamification --path=/var/www/html && echo "✅ Directory plugin is active" || \
-    (wp plugin is-active simple-gamification --path=/var/www/html && echo "✅ Single file plugin is active" || echo "❌ Plugin failed to activate")
-else
-    echo "Warning: simple-gamification.php not found in devscripts"
-fi
+# Simple gamification has been removed
+echo "Simple gamification plugin has been removed from this installation."
 
 # Verify GamiPress plugins activation status
 echo "Verifying GamiPress plugins activation status:"
@@ -207,6 +152,24 @@ fi
 # Verify plugins are activated
 echo "Verifying BuddyX recommended plugins activation status:"
 wp plugin list --path=/var/www/html | grep -E 'classic-widgets|elementor|kirki'
+
+# Activate Akismet Anti-Spam and delete Hello Dolly
+echo "Managing required and unwanted plugins..."
+# Activate Akismet Anti-Spam if installed
+if wp plugin is-installed akismet --path=/var/www/html; then
+    echo "Akismet Anti-Spam plugin already installed, activating..."
+    wp plugin activate akismet --path=/var/www/html || echo "Warning: Failed to activate Akismet Anti-Spam plugin"
+else
+    echo "Installing Akismet Anti-Spam plugin..."
+    wp plugin install akismet --activate --path=/var/www/html || echo "Warning: Failed to install Akismet Anti-Spam plugin"
+fi
+
+# Delete Hello Dolly plugin if it exists
+if wp plugin is-installed hello --path=/var/www/html; then
+    echo "Deleting Hello Dolly plugin..."
+    wp plugin deactivate hello --path=/var/www/html
+    wp plugin delete hello --path=/var/www/html || echo "Warning: Failed to delete Hello Dolly plugin"
+fi
 
 # Set permalink structure and ensure site URL is correct
 echo "Setting permalink structure and ensuring site URLs are correct..."

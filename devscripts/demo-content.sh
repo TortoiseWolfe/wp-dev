@@ -1,6 +1,28 @@
 #!/bin/bash
 set -e
 
+# SIMPLIFIED VERSION - Only initializes BuddyPress components needed for ScriptHammer band
+echo "Running simplified BuddyPress initialization (demo content removed)"
+
+# Parse command line arguments
+SKIP_ALL=false
+
+# Process command line arguments
+for arg in "$@"; do
+  case $arg in
+    --help)
+      echo "Usage: $0 [options]"
+      echo "Options:"
+      echo "  --skip-all     Skip all content creation, only initialize BuddyPress"
+      exit 0
+      ;;
+    --skip-all)
+      SKIP_ALL=true
+      echo "Skipping all demo content, only initializing BuddyPress"
+      ;;
+  esac
+done
+
 # Ensure BuddyPress database tables are properly initialized
 if ! wp db query "SHOW TABLES LIKE 'wp_bp_groups'" --path=/var/www/html | grep -q "wp_bp_groups"; then
     echo "BuddyPress database tables missing. Forcing proper initialization..."
@@ -199,8 +221,12 @@ echo "All required BuddyPress components are now verified and activated!"
 echo "Confirming BuddyPress components final status:"
 wp bp component list --path=/var/www/html
 
-# Note: Metronome app is now handled in the scripthammer.sh script
-# This ensures it's tied directly to the band content rather than general demo content
+echo "BuddyPress initialization complete!"
+echo "All demo content generation has been removed."
+echo "ScriptHammer band content is handled by scripthammer.sh script."
+
+# Exit here - the rest of the demo content generation has been deprecated
+exit 0
 
 echo "Creating ScriptHammer band members..."
 
@@ -1752,16 +1778,7 @@ if [ -z "$current_permalink" ]; then
 fi
 
 # Create gamification plugin for WordPress
-echo "Setting up functional gamification system..."
-mkdir -p /var/www/html/wp-content/plugins/simple-tutorial-gamification/assets
-
-# Copy the plugin files
-cp /usr/local/bin/devscripts/simple-gamification.php /var/www/html/wp-content/plugins/simple-tutorial-gamification/simple-tutorial-gamification.php
-cp /usr/local/bin/devscripts/simple-gamification.js /var/www/html/wp-content/plugins/simple-tutorial-gamification/assets/simple-gamification.js
-cp /usr/local/bin/devscripts/simple-gamification.css /var/www/html/wp-content/plugins/simple-tutorial-gamification/assets/simple-gamification.css
-
-# Activate the plugin
-wp plugin activate simple-tutorial-gamification --path=/var/www/html || echo "Failed to activate plugin, will be activated on next page load"
+echo "Simple gamification plugin has been removed - skipping gamification setup."
 
 # Create curriculum page with interactive gamification
 echo "Creating Tutorial Course Curriculum page with interactive gamification elements..."
@@ -1833,23 +1850,8 @@ wp post create --post_type=page --post_title="Tutorial Course Curriculum" --post
 
 echo "Tutorial content for BuddyPress and BuddyX created successfully!"
 
-# Create Allyship System only if not skipping demo content
-if ! $SKIP_DEMO; then
-    echo "Setting up Allyship System..."
-
-    # Create directory for Allyship System
-    mkdir -p /var/www/html/wp-content/plugins/allyship-system/assets
-
-    # Copy the Allyship System files
-    cp /usr/local/bin/devscripts/ally-content/allyship-system.php /var/www/html/wp-content/plugins/allyship-system/allyship-system.php
-
-    # Setup Allyship System
-    wp eval 'require_once(WP_CONTENT_DIR . "/plugins/allyship-system/allyship-system.php"); setup_allyship_system();' --path=/var/www/html || echo "Failed to set up Allyship System"
-
-    echo "Allyship System setup complete!"
-else
-    echo "Skipping Allyship System setup (focus on band content only)."
-fi
+# Allyship System has been removed
+echo "Allyship System has been removed from this installation."
 # endregion: TUTORIAL CONTENT CREATION
 
 # Add the Tutorial Course Curriculum page to the menu

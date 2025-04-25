@@ -7,18 +7,77 @@ chmod +x "$(realpath "$0")" 2>/dev/null || true
 
 # Parse command-line arguments
 CREATE_METRONOME=false
+USE_IMPORT=true  # Default to using import approach
 
 # Process all arguments
+IMPORT_FROM=""
+
 for arg in "$@"; do
     case $arg in
         --with-metronome)
             CREATE_METRONOME=true
+            ;;
+        --force-create)
+            USE_IMPORT=false
+            ;;
+        --use-import)
+            USE_IMPORT=true
+            ;;
+        --recover)
+            # Look for export files in standard locations
+            if [ -f "/var/www/html/wp-content/exports/band-members-000.xml" ]; then
+                IMPORT_FROM="/var/www/html/wp-content/exports/band-members-000.xml"
+            elif [ -f "/usr/local/bin/devscripts/exports/band-members-000.xml" ]; then
+                IMPORT_FROM="/usr/local/bin/devscripts/exports/band-members-000.xml"
+            elif [ -f "/var/www/html/wp-content/imports/band-members-000.xml" ]; then
+                IMPORT_FROM="/var/www/html/wp-content/imports/band-members-000.xml"
+            fi
+            ;;
+        --import=*)
+            IMPORT_FROM="${arg#*=}"
             ;;
         debug)
             set -x
             ;;
     esac
 done
+
+# Function to check if band content already exists
+band_content_exists() {
+    # Check for Ivory's main post (Meet Ivory)
+    if wp post list --name="meet-ivory-the-melody-master-of-scripthammer" --post_type=post --format=count --path=/var/www/html | grep -q "1"; then
+        echo "✅ Band content already exists (found Meet Ivory post)"
+        return 0  # Success - content exists
+    else
+        echo "⚠️ Band content not found"
+        return 1  # Failure - content not found
+    fi
+}
+
+# Function to import band content from exports
+import_band_content() {
+    # Check if export file exists
+    EXPORT_FILE="/var/www/html/wp-content/exports-volume/all-band-content-000.xml"
+    
+    if [ -f "$EXPORT_FILE" ]; then
+        echo "🔄 Importing band content from $EXPORT_FILE..."
+        
+        # Install WordPress importer plugin if needed
+        if ! wp plugin is-installed wordpress-importer --path=/var/www/html; then
+            echo "Installing WordPress Importer plugin..."
+            wp plugin install wordpress-importer --activate --path=/var/www/html
+        fi
+        
+        # Import the content
+        wp import "$EXPORT_FILE" --authors=create --path=/var/www/html
+        
+        echo "✅ Band content imported successfully"
+        return 0
+    else
+        echo "❌ Export file not found at $EXPORT_FILE"
+        return 1
+    fi
+}
 
 # Force activation of all required components before proceeding
 echo "Ensuring all BuddyPress components are activated..."
@@ -27,7 +86,189 @@ for component in xprofile members groups friends messages activity notifications
     sleep 1
 done
 
-echo "Creating ScriptHammer band members..."
+echo "Setting up ScriptHammer band content..."
+
+# Check if we should import content from a specific file
+if [ -n "$IMPORT_FROM" ]; then
+    echo "🔄 Recovering band content from $IMPORT_FROM..."
+    
+    # Install WordPress importer plugin if needed
+    if ! wp plugin is-installed wordpress-importer --path=/var/www/html; then
+        echo "Installing WordPress Importer plugin..."
+        wp plugin install wordpress-importer --activate --path=/var/www/html
+    else
+        wp plugin activate wordpress-importer --path=/var/www/html
+    fi
+    
+    # Import the content
+    echo "Importing content..."
+    wp import "$IMPORT_FROM" --authors=create --skip=duplicate --path=/var/www/html
+    
+    # Install the metronome app if requested
+    if [ "$CREATE_METRONOME" = true ]; then
+        echo "Installing metronome app for recovered content..."
+        mkdir -p /var/www/html/wp-content/mu-plugins
+        
+        if [ -f "/usr/local/bin/devscripts/metronome-app.php" ]; then
+            cp /usr/local/bin/devscripts/metronome-app.php /var/www/html/wp-content/mu-plugins/
+            chmod 644 /var/www/html/wp-content/mu-plugins/metronome-app.php
+            chown www-data:www-data /var/www/html/wp-content/mu-plugins/metronome-app.php
+            echo "✅ Metronome app installed for recovered content"
+        else
+            echo "❌ ERROR: Metronome app not found"
+        fi
+    fi
+    
+    echo "✅ Content recovery complete!"
+    exit 0
+fi
+
+# First approach: Try to use the import method if enabled
+if [ "$USE_IMPORT" = true ]; then
+    if band_content_exists; then
+        echo "📝 Band content already exists. No need to recreate or import."
+        
+        # Install the metronome app if requested
+        if [ "$CREATE_METRONOME" = true ]; then
+            echo "Installing metronome app for existing content..."
+            # Create the mu-plugins directory if it doesn't exist
+            mkdir -p /var/www/html/wp-content/mu-plugins
+            
+            # Copy the metronome app
+            if [ -f "/usr/local/bin/devscripts/metronome-app.php" ]; then
+                cp /usr/local/bin/devscripts/metronome-app.php /var/www/html/wp-content/mu-plugins/
+                chmod 644 /var/www/html/wp-content/mu-plugins/metronome-app.php
+                chown www-data:www-data /var/www/html/wp-content/mu-plugins/metronome-app.php
+                echo "✅ Metronome app installed as mu-plugin for existing content"
+            else
+                echo "❌ CRITICAL ERROR: Metronome app not found at /usr/local/bin/devscripts/metronome-app.php"
+            fi
+        fi
+        
+        # Exit early - no need to continue with content creation
+        echo "✅ ScriptHammer band setup completed successfully (using existing content)!"
+        exit 0
+    else
+        # Content doesn't exist, try to import it
+        if import_band_content; then
+            echo "✅ Content imported successfully!"
+            
+            # Install the metronome app if requested
+            if [ "$CREATE_METRONOME" = true ]; then
+                echo "Installing metronome app for imported content..."
+                # Create the mu-plugins directory if it doesn't exist
+                mkdir -p /var/www/html/wp-content/mu-plugins
+                
+                # Copy the metronome app
+                if [ -f "/usr/local/bin/devscripts/metronome-app.php" ]; then
+                    cp /usr/local/bin/devscripts/metronome-app.php /var/www/html/wp-content/mu-plugins/
+                    chmod 644 /var/www/html/wp-content/mu-plugins/metronome-app.php
+                    chown www-data:www-data /var/www/html/wp-content/mu-plugins/metronome-app.php
+                    echo "✅ Metronome app installed as mu-plugin for imported content"
+                else
+                    echo "❌ CRITICAL ERROR: Metronome app not found at /usr/local/bin/devscripts/metronome-app.php"
+                fi
+            fi
+            
+            # Exit early - no need to continue with content creation
+            echo "✅ ScriptHammer band setup completed successfully (using imported content)!"
+            exit 0
+        else
+            echo "⚠️ Import failed. Falling back to manual content creation..."
+            # Continue with the script to create content manually
+        fi
+    fi
+fi
+
+# Check if band content already exists before creating
+echo "Checking for existing band content..."
+if wp post list --name=meet-ivory-the-melody-master-of-scripthammer --post_type=post --format=count --path=/var/www/html | grep -q "1"; then
+    echo "✅ Band content already exists - using existing content"
+    
+    # Just install the metronome app if requested
+    if [ "$CREATE_METRONOME" = true ]; then
+        echo "Installing metronome app for existing content..."
+        # Create the mu-plugins directory if it doesn't exist
+        mkdir -p /var/www/html/wp-content/mu-plugins
+        
+        # Copy the metronome app
+        if [ -f "/usr/local/bin/devscripts/metronome-app.php" ]; then
+            cp /usr/local/bin/devscripts/metronome-app.php /var/www/html/wp-content/mu-plugins/
+            chmod 644 /var/www/html/wp-content/mu-plugins/metronome-app.php
+            chown www-data:www-data /var/www/html/wp-content/mu-plugins/metronome-app.php
+            echo "✅ Metronome app installed as mu-plugin for existing content"
+        else
+            echo "❌ ERROR: Metronome app not found at /usr/local/bin/devscripts/metronome-app.php"
+        fi
+        
+        # Create the metronome page if it doesn't exist
+        if ! wp post exists --post_type=page --post_name="band-metronome" --path=/var/www/html; then
+            echo "Creating band metronome page..."
+            wp post create --post_type=page --post_title="ScriptHammer Drum Machine" --post_name="band-metronome" --post_status="publish" --post_content="<h2>ScriptHammer Band Practice Tools</h2>
+
+<div class=\"band-metronome\">
+    <h3>ScriptHammer Drum Machine</h3>
+    <p>Our custom drum sequencer for band practice and composition. Create beats for our signature fractal funk and cosmic rhythms.</p>
+    
+    <div class=\"app-container\">
+        [scripthammer_react_app]
+    </div>
+    
+    <h4>Band Notes</h4>
+    <ul>
+        <li><strong>Basic Rock</strong> - Use for foundational practice and warm-ups</li>
+        <li><strong>Disco</strong> - For \"Blue Matrix\" practice sessions</li>
+        <li><strong>Hip Hop</strong> - For \"Quantum Groove\" and \"Neural Patterns\" tracks</li>
+        <li><strong>Jazz</strong> - For \"Fractal Motion\" and \"Harmonic Drift\" pieces</li>
+        <li><strong>Waltz</strong> - For \"Temporal Shift\" section in our third set</li>
+    </ul>
+    
+    <p><strong>Crash says:</strong> Remember to practice with the hi-hat patterns we worked on last week. Especially focus on the off-beat accents for the Syncopation Suite.</p>
+</div>
+
+<style>
+.band-metronome {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.app-container {
+    margin: 30px 0;
+}
+
+h3 {
+    color: #333;
+    border-bottom: 2px solid #3b82f6;
+    padding-bottom: 10px;
+}
+
+ul {
+    background-color: #f0f4f8;
+    padding: 15px 15px 15px 35px;
+    border-radius: 4px;
+    border-left: 3px solid #3b82f6;
+}
+
+li {
+    margin: 8px 0;
+}
+</style>" --path=/var/www/html || true
+            
+            echo "✅ Created ScriptHammer Band Metronome page"
+        else
+            echo "ScriptHammer Band Metronome page already exists"
+        fi
+    fi
+    
+    echo "✅ ScriptHammer band setup completed successfully (using existing content)!"
+    exit 0
+fi
+
+echo "No existing band content found. Creating ScriptHammer band members..."
 
 # Make sure BuddyPress is active and database tables are created
 echo "Verifying BuddyPress is active and database tables exist..."
@@ -839,6 +1080,68 @@ else
     echo "Ivory already has main posts, skipping creation"
 fi
 
+# Function to embed image in post content with text wrapping
+embed_image_in_post_content() {
+    local post_id=$1
+    local image_path=$2
+    local member_name=$3
+    
+    echo "Embedding image for $member_name in post content with text wrapping..."
+    
+    # Upload the image to the WordPress media library
+    local attach_id=$(wp media import "$image_path" --post_id="$post_id" --title="$member_name Portrait" --porcelain --path=/var/www/html)
+    
+    if [ -n "$attach_id" ]; then
+        echo "✅ Uploaded image for $member_name (attachment ID: $attach_id)"
+        
+        # Set as featured image first (this is the safest approach)
+        wp post meta update "$post_id" "_thumbnail_id" "$attach_id" --path=/var/www/html
+        
+        # Now also embed directly in post content for better display and wrapping
+        # Get the full image URL directly from WP's attachment system
+        local image_url=$(wp eval "echo esc_url(wp_get_attachment_image_url($attach_id, 'medium'));" --path=/var/www/html)
+        
+        # Use WP-CLI's PHP context to safely manipulate the post content - this is much more reliable than bash string manipulation
+        wp eval "
+            \$post_id = $post_id;
+            \$image_url = '$image_url';
+            \$member_name = '$member_name';
+            
+            // Get current post content
+            \$content = get_post_field('post_content', \$post_id);
+            
+            // Create HTML block with left-floating image
+            \$image_html = '<!-- wp:html -->
+<div style=\"float:left; margin:0 20px 10px 0; width:200px;\">
+<img src=\"' . \$image_url . '\" alt=\"' . \$member_name . ' Portrait\" width=\"200\" style=\"max-width:200px; border-radius:8px;\"/>
+</div>
+<!-- /wp:html -->';
+            
+            // Find first heading end tag
+            \$parts = explode('<!-- /wp:heading -->', \$content, 2);
+            if (count(\$parts) >= 2) {
+                // Insert image HTML after first heading
+                \$new_content = \$parts[0] . '<!-- /wp:heading -->' . PHP_EOL . PHP_EOL . \$image_html . PHP_EOL . PHP_EOL . \$parts[1];
+                
+                // Update post with new content
+                \$result = wp_update_post(['ID' => \$post_id, 'post_content' => \$new_content]);
+                
+                if (\$result) {
+                    echo 'Successfully embedded image for $member_name in post content.';
+                } else {
+                    echo 'Failed to update post content for $member_name.';
+                }
+            } else {
+                echo 'Could not find heading in post content for $member_name.';
+            }
+        " --path=/var/www/html
+        
+        echo "✅ Successfully set image for $member_name as featured image and embedded in content"
+    else
+        echo "❌ Failed to upload image for $member_name"
+    fi
+}
+
 # Now create the band member series posts if they don't exist yet
 echo "Checking for band member series posts..."
 member_series_count=$(wp post list --post_type=post --author="$creator_id" --s="Meet " --format=count --path=/var/www/html)
@@ -937,6 +1240,8 @@ if [ "$member_series_count" -lt "7" ]; then
                    
     if [ -n "$crash_post_id" ]; then
         echo "Created post about Crash with ID: $crash_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$crash_post_id" "/usr/local/bin/devscripts/assets/Crash.png" "Crash"
     fi
     
     # Create the second post about Chops
@@ -1034,6 +1339,8 @@ if [ "$member_series_count" -lt "7" ]; then
                    
     if [ -n "$chops_post_id" ]; then
         echo "Created post about Chops with ID: $chops_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$chops_post_id" "/usr/local/bin/devscripts/assets/Chops.png" "Chops"
     fi
     
     # Create post about Reed
@@ -1131,6 +1438,8 @@ if [ "$member_series_count" -lt "7" ]; then
                   
     if [ -n "$reed_post_id" ]; then
         echo "Created post about Reed with ID: $reed_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$reed_post_id" "/usr/local/bin/devscripts/assets/Reed.png" "Reed"
     fi
     
     # Create post about Brass
@@ -1228,6 +1537,8 @@ if [ "$member_series_count" -lt "7" ]; then
                   
     if [ -n "$brass_post_id" ]; then
         echo "Created post about Brass with ID: $brass_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$brass_post_id" "/usr/local/bin/devscripts/assets/Brass.png" "Brass"
     fi
     
     # Create post about Verse
@@ -1325,6 +1636,8 @@ if [ "$member_series_count" -lt "7" ]; then
                   
     if [ -n "$verse_post_id" ]; then
         echo "Created post about Verse with ID: $verse_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$verse_post_id" "/usr/local/bin/devscripts/assets/Verse.png" "Verse"
     fi
     
     # Create post about Form
@@ -1422,6 +1735,8 @@ if [ "$member_series_count" -lt "7" ]; then
                   
     if [ -n "$form_post_id" ]; then
         echo "Created post about Form with ID: $form_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$form_post_id" "/usr/local/bin/devscripts/assets/Form.png" "Form"
     fi
     
     # Create the final post about Ivory himself
@@ -1531,12 +1846,17 @@ if [ "$member_series_count" -lt "7" ]; then
                   
     if [ -n "$ivory_post_id" ]; then
         echo "Created post about Ivory with ID: $ivory_post_id"
+        # Embed image in content
+        embed_image_in_post_content "$ivory_post_id" "/usr/local/bin/devscripts/assets/Ivory.png" "Ivory"
     fi
     
     echo "Created all 7 posts in Ivory's band member series"
 else
     echo "Ivory already has band member series posts, skipping creation"
 fi
+
+# Create plugins directory if it doesn't exist
+mkdir -p /var/www/html/wp-content/plugins
 
 # Create the band metronome page if requested
 if [ "$CREATE_METRONOME" = true ]; then
@@ -1651,4 +1971,48 @@ else
     echo "Skipping metronome page creation (use --with-metronome to create it)"
 fi
 
+# Export the created content for future imports
+if [ "$USE_IMPORT" = false ]; then
+    echo "Exporting newly created band content for future use..."
+    
+    # Create the exports directory if it doesn't exist
+    mkdir -p /var/www/html/wp-content/exports
+    
+    # Export all band-related content
+    wp export --post_type=post --category=band-members --skip_comments --dir=/var/www/html/wp-content/exports --filename_format=band-members-{n}.xml --path=/var/www/html
+    
+    # Export band pages
+    wp export --post_type=page --name=band-metronome --skip_comments --dir=/var/www/html/wp-content/exports --filename_format=band-pages-{n}.xml --path=/var/www/html
+    
+    # Export all band content (across all categories)
+    wp export --post_type=post --category=music --category=tour --category=band-members --skip_comments --dir=/var/www/html/wp-content/exports --filename_format=all-band-content-{n}.xml --path=/var/www/html
+    
+    # Copy exports to the volume-mounted directory if it exists
+    if [ -d "/var/www/html/wp-content/exports-volume" ]; then
+        echo "Copying exports to volume-mounted directory..."
+        cp -f /var/www/html/wp-content/exports/*.xml /var/www/html/wp-content/exports-volume/ || true
+    fi
+    
+    echo "✅ Content exported successfully for future imports"
+fi
+
+# Export content for easier future installs
+echo "Exporting band content for backup and future installs..."
+mkdir -p /var/www/html/wp-content/exports
+
+# Check if the importer plugin is installed
+if ! wp plugin is-installed wordpress-importer --path=/var/www/html; then
+    wp plugin install wordpress-importer --activate --path=/var/www/html || true
+fi
+
+# Export band member posts
+wp export --post_type=post --category=band-members --skip_comments --dir=/var/www/html/wp-content/exports --filename_format=band-members-{n}.xml --path=/var/www/html || true
+
+# Export music posts
+wp export --post_type=post --category=music --skip_comments --dir=/var/www/html/wp-content/exports --filename_format=music-posts-{n}.xml --path=/var/www/html || true
+
+# Export pages
+wp export --post_type=page --skip_comments --dir=/var/www/html/wp-content/exports --filename_format=pages-{n}.xml --path=/var/www/html || true
+
+echo "✅ Content exported to wp-content/exports directory"
 echo "ScriptHammer band setup completed successfully!"
