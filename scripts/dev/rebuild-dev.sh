@@ -25,16 +25,48 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
-echo "Step 1: Stopping and removing all containers..."
+echo "Step 1: Deciding between full reset or container-only rebuild..."
 cd $PROJECT_ROOT
-docker-compose down -v
 
-echo "Step 2: Cleaning up Docker resources..."
+# Ask if user wants to preserve data (following "cattle not pets" approach)
+if [[ "$1" == "--reset" || "$1" == "-r" ]]; then
+  echo "🗑️ FULL RESET: Removing all containers AND volumes (--reset flag provided)"
+  preserve_data=false
+elif [[ "$1" == "--preserve" || "$1" == "-p" ]]; then
+  echo "🔄 CONTAINER REBUILD: Preserving data volumes, only replacing containers (--preserve flag provided)"
+  preserve_data=true
+else
+  read -p "Do you want to preserve WordPress data? This is recommended for normal development. (y/n): " preserve_response
+  if [[ "$preserve_response" == "y" || "$preserve_response" == "Y" ]]; then
+    preserve_data=true
+    echo "🔄 CONTAINER REBUILD: Preserving data volumes, only replacing containers"
+  else
+    preserve_data=false
+    echo "🗑️ FULL RESET: Removing all containers AND volumes"
+  fi
+fi
+
+echo "Step 2: Stopping and removing containers..."
+if [ "$preserve_data" = true ]; then
+  # Stop containers but preserve volumes
+  docker-compose down
+else
+  # Stop containers and remove volumes
+  docker-compose down -v
+fi
+
+echo "Step 3: Cleaning up Docker resources..."
 # Remove any orphaned containers with the project name
 COMPOSE_PROJECT=$(basename "$PROJECT_ROOT")
 docker ps -a | grep $COMPOSE_PROJECT | awk '{print $1}' | xargs -r docker rm -f
-# Remove volumes with the project name
-docker volume ls | grep $COMPOSE_PROJECT | awk '{print $2}' | xargs -r docker volume rm
+
+# Remove volumes only if doing a complete reset
+if [ "$preserve_data" = false ]; then
+  echo "  Removing all Docker volumes - all WordPress data will be lost!"
+  docker volume ls | grep $COMPOSE_PROJECT | awk '{print $2}' | xargs -r docker volume rm
+else
+  echo "  Preserving Docker volumes - WordPress data will be maintained"
+fi
 
 echo "Step 3: Running setup-local-dev.sh to generate new credentials..."
 cd $PROJECT_ROOT
@@ -48,9 +80,77 @@ echo "Press Ctrl+C when setup is complete (you see 'WordPress init process compl
 docker-compose logs -f wordpress wp-setup
 
 echo ""
-echo "Step 6: Ensuring ReactPress integration is working correctly..."
-# Wait briefly for WordPress to be fully initialized
-sleep 5
+echo "Step 6: Setting up WordPress..."
+# Wait longer for WordPress to be fully initialized
+echo "Waiting for WordPress to be fully initialized..."
+sleep 15
+
+# Ensure BuddyPress components are activated with special focus on critical components
+echo "Activating BuddyPress components..."
+docker-compose exec wordpress bash -c "
+  # First ensure the most critical components (friend requests, private messaging, user groups, site tracking)
+  # are activated separately and explicitly to guarantee they're active
+  echo \"🔄 Activating friend requests component...\"
+  wp bp component activate friends --path=/var/www/html && echo \"✅ Friend requests activated\" || echo \"❌ Failed to activate friend requests\"
+  
+  echo \"🔄 Activating private messaging component...\"
+  wp bp component activate messages --path=/var/www/html && echo \"✅ Private messaging activated\" || echo \"❌ Failed to activate private messaging\"
+  
+  echo \"🔄 Activating user groups component...\"
+  wp bp component activate groups --path=/var/www/html && echo \"✅ User groups activated\" || echo \"❌ Failed to activate user groups\"
+  
+  echo \"🔄 Activating site tracking component...\"
+  wp bp component activate blogs --path=/var/www/html && echo \"✅ Site tracking activated\" || echo \"❌ Failed to activate site tracking\"
+
+  # Now activate remaining components
+  echo \"Activating remaining BuddyPress components...\"
+  for component in xprofile members activity notifications settings; do
+    wp bp component activate \$component --path=/var/www/html
+    echo \"✅ Activated BuddyPress component: \$component\"
+  done
+"
+
+echo "Removing default WordPress content..."
+
+# Remove default WordPress content with extra safety checks
+echo "Removing default Hello World post and Sample Page..."
+docker-compose exec wordpress bash -c "
+  # Find and delete Hello World post by title AND verify it's post ID 1
+  HELLO_POST=\$(wp post list --post_type=post --post_status=any --title='Hello world!' --fields=ID,title --format=json --path=/var/www/html 2>/dev/null)
+  if [ ! -z \"\$HELLO_POST\" ]; then
+    HELLO_ID=\$(echo \$HELLO_POST | grep -o '\"id\":[0-9]*' | grep -o '[0-9]*')
+    HELLO_TITLE=\$(echo \$HELLO_POST | grep -o '\"title\":\"Hello world!\"')
+    
+    # Only delete if BOTH title matches AND it's the default post (typically ID 1)
+    if [ ! -z \"\$HELLO_TITLE\" ] && [ \"\$HELLO_ID\" -eq 1 ]; then
+      wp post delete \$HELLO_ID --force --path=/var/www/html
+      echo '✅ Safely deleted default Hello World post (ID 1)'
+    else
+      echo '⚠️ Found a Hello World post but ID wasn\\'t 1. Not deleting for safety.'
+    fi
+  else
+    echo '✓ No Hello World post found (already deleted)'
+  fi
+
+  # Find and delete Sample Page by title AND verify it's page ID 2
+  SAMPLE_PAGE=\$(wp post list --post_type=page --post_status=any --title='Sample Page' --fields=ID,title --format=json --path=/var/www/html 2>/dev/null)
+  if [ ! -z \"\$SAMPLE_PAGE\" ]; then
+    SAMPLE_ID=\$(echo \$SAMPLE_PAGE | grep -o '\"id\":[0-9]*' | grep -o '[0-9]*')
+    SAMPLE_TITLE=\$(echo \$SAMPLE_PAGE | grep -o '\"title\":\"Sample Page\"')
+    
+    # Only delete if BOTH title matches AND it's the default page (typically ID 2)
+    if [ ! -z \"\$SAMPLE_TITLE\" ] && [ \"\$SAMPLE_ID\" -eq 2 ]; then
+      wp post delete \$SAMPLE_ID --force --path=/var/www/html
+      echo '✅ Safely deleted default Sample Page (ID 2)'
+    else
+      echo '⚠️ Found a Sample Page but ID wasn\\'t 2. Not deleting for safety.'
+    fi
+  else
+    echo '✓ No Sample Page found (already deleted)'
+  fi
+"
+
+echo "Step 7: Ensuring ReactPress integration is working correctly..."
 
 # Install the Metronome app - CRITICAL COMPONENT
 echo "Installing Metronome app in mu-plugins directory..."
@@ -248,6 +348,48 @@ fi
 
 echo ""
 echo "✅ Environment rebuild complete!"
+echo "Verifying BuddyPress components..."
+docker-compose exec wordpress bash -c "
+  # Make one final check to ensure all required BuddyPress components are active
+  echo 'BuddyPress component status:'
+  wp bp component list --status=active --path=/var/www/html | grep -E 'friends|messages|groups|blogs' || echo 'Critical components NOT active!'
+  
+  # Check specific key components separately with clear success/fail messages
+  echo 'Verifying critical components individually:'
+  
+  if wp bp component is-active friends --path=/var/www/html; then
+    echo \"✅ Friend requests - ACTIVE\"
+  else
+    echo \"❌ CRITICAL ERROR: Friend requests component is NOT active. Trying one more time...\"
+    wp bp component activate friends --path=/var/www/html
+  fi
+  
+  if wp bp component is-active messages --path=/var/www/html; then
+    echo \"✅ Private messaging - ACTIVE\"
+  else
+    echo \"❌ CRITICAL ERROR: Private messaging component is NOT active. Trying one more time...\"
+    wp bp component activate messages --path=/var/www/html
+  fi
+  
+  if wp bp component is-active groups --path=/var/www/html; then
+    echo \"✅ User groups - ACTIVE\"
+  else
+    echo \"❌ CRITICAL ERROR: User groups component is NOT active. Trying one more time...\"
+    wp bp component activate groups --path=/var/www/html
+  fi
+  
+  if wp bp component is-active blogs --path=/var/www/html; then
+    echo \"✅ Site tracking - ACTIVE\"
+  else
+    echo \"❌ CRITICAL ERROR: Site tracking component is NOT active. Trying one more time...\"
+    wp bp component activate blogs --path=/var/www/html
+  fi
+  
+  # Final status check for all components
+  echo 'Overall component status:'
+  wp bp component list --status=inactive --path=/var/www/html || echo 'All components active!'
+"
+
 echo "Access WordPress at: $WP_SITE_URL"
 echo "Admin user: ${WP_ADMIN_USER:-admin}"
 echo "Admin password: $WP_ADMIN_PASSWORD"

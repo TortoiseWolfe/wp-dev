@@ -517,20 +517,30 @@ fi
 # Ensure all required BuddyPress components are active
 echo "Ensuring all required BuddyPress components are active..."
 
-# Array of required components
+# First explicitly activate the critical components to guarantee they work
+echo "🔄 Activating friend requests component (friends)..."
+wp bp component activate friends --path=/var/www/html && echo "✅ Friend requests activated" || echo "❌ Failed to activate friend requests"
+
+echo "🔄 Activating private messaging component (messages)..."
+wp bp component activate messages --path=/var/www/html && echo "✅ Private messaging activated" || echo "❌ Failed to activate private messaging"
+
+echo "🔄 Activating user groups component (groups)..."
+wp bp component activate groups --path=/var/www/html && echo "✅ User groups activated" || echo "❌ Failed to activate user groups"
+
+echo "🔄 Activating site tracking component (blogs)..."
+wp bp component activate blogs --path=/var/www/html && echo "✅ Site tracking activated" || echo "❌ Failed to activate site tracking"
+
+# Now activate the remaining components
+echo "Activating remaining BuddyPress components..."
 required_components=(
     "xprofile"
     "members"
-    "groups"
-    "friends"
-    "messages"
     "activity"
     "notifications"
     "settings"
-    "blogs"
 )
 
-# Activate each component if not already active
+# Activate remaining components
 for component in "${required_components[@]}"; do
     if ! wp bp component list --path=/var/www/html | grep -q "$component.*active"; then
         echo "$component component is not active. Activating..."
@@ -543,14 +553,22 @@ for component in "${required_components[@]}"; do
     fi
 done
 
-# Verify all critical components are active
-critical_components=("groups" "friends" "messages" "activity")
+# Verify all critical components are active with detailed error messages
+critical_components=("groups" "friends" "messages" "blogs")
 for component in "${critical_components[@]}"; do
-    if ! wp bp component list --path=/var/www/html | grep -q "$component.*active"; then
-        echo "Critical component $component could not be activated. Exiting."
-        exit 1
+    if ! wp bp component is-active $component --path=/var/www/html; then
+        echo "❌ CRITICAL ERROR: Component '$component' could not be activated. Trying one more time..."
+        wp bp component activate $component --path=/var/www/html
+        
+        # Check again after second attempt
+        if ! wp bp component is-active $component --path=/var/www/html; then
+            echo "❌ CRITICAL ERROR: Component '$component' could not be activated after second attempt. Exiting."
+            exit 1
+        fi
     fi
 done
+
+echo "✅ All critical BuddyPress components successfully activated."
 
 echo "All required BuddyPress components are now active."
 
@@ -957,6 +975,10 @@ band_formation_post_content=$(cat <<'EOT'
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
 <!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/groups/scripthammer/">ScriptHammer's group page</a> to learn more about our band.</strong></p>
+<!-- /wp:paragraph -->
 EOT
 )
 
@@ -1009,12 +1031,21 @@ tour_announcement_post_content=$(cat <<'EOT'
 <!-- wp:paragraph -->
 <p>—Ivory, on behalf of ScriptHammer</p>
 <!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/groups/scripthammer/">ScriptHammer's group page</a> to learn more about our band.</strong></p>
+<!-- /wp:paragraph -->
 EOT
 )
 
 # No category variables needed - we'll get them by slug when needed
 
 # Create Ivory's blog posts
+# First remove default WordPress content
+echo "Removing default WordPress content..."
+wp post delete 1 --force --path=/var/www/html || echo "No default Hello World post found"
+wp post delete 2 --force --path=/var/www/html || echo "No default Sample Page found"
+
 echo "Creating Ivory's blog posts about the band..."
 
 # Create both posts with a more robust approach
@@ -1043,39 +1074,41 @@ if [ "$existing_posts" -lt "2" ]; then
     
     echo "Using category IDs - Music: $MUSIC_CAT_ID, Tour: $TOUR_CAT_ID, Band Members: $MEMBERS_CAT_ID"
     
-    # Create main posts in sequence
-    echo "Creating band formation post..."
+    # Set up publication dates (starting from May 1st, 2025)
+    START_DATE="2025-05-01"
+    PUBLISH_TIME="10:00:00"
+    post_index=0
+    
+    # Function to calculate the publish date for each post
+    get_publish_date() {
+        local index=$1
+        date -d "${START_DATE} + ${index} days" "+%Y-%m-%d ${PUBLISH_TIME}"
+    }
+    
+    # Create main posts in sequence - all scheduled to publish one per day starting May 1st
+    echo "Creating band formation post (scheduled for $(get_publish_date $post_index))..."
     formation_id=$(wp post create --post_title="The Birth of ScriptHammer: How We Came Together" \
                    --post_content="$band_formation_post_content" \
-                   --post_status="publish" \
+                   --post_status="future" \
                    --post_author="$creator_id" \
                    --post_category=$MUSIC_CAT_ID \
+                   --post_date="$(get_publish_date $post_index)" \
                    --porcelain \
                    --path=/var/www/html)
+                   
+    post_index=$((post_index + 1))
                    
     if [ -n "$formation_id" ]; then
         echo "Created band formation post with ID: $formation_id"
     fi
     
-    echo "Creating tour announcement post..."
-    # Create post with both categories at once - use a specific slug to avoid conflict with group slug
-    tour_id=$(wp post create --post_title="ScriptHammer Announces: The Aether Trail Tour of 1848" \
-                   --post_content="$tour_announcement_post_content" \
-                   --post_status="publish" \
-                   --post_author="$creator_id" \
-                   --post_name="aether-trail-tour-1848" \
-                   --post_category="$MUSIC_CAT_ID,$TOUR_CAT_ID" \
-                   --porcelain \
-                   --path=/var/www/html)
+    # We'll create tour announcement last, after all band member introductions
+    # Save the tour post index to use at the end
+    tour_post_index=$post_index
     
-    if [ -n "$tour_id" ]; then
-        echo "Created tour announcement post with ID: $tour_id with categories Music and Tour"
-        # Verify categories
-        wp post term list $tour_id category --format=csv --path=/var/www/html || true
-        echo "Added proper categories to both posts"
-    fi
+    # Skip the tour announcement for now - it will be created after band member posts
     
-    echo "Created Ivory's main blog posts successfully"
+    echo "Created initial band formation post - will create tour announcement last"
 else
     echo "Ivory already has main posts, skipping creation"
 fi
@@ -1228,15 +1261,23 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/crash/profile/">Crash's profile page</a> to learn more about our percussionist.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Crash post (scheduled for $(get_publish_date $post_index))..."
     crash_post_id=$(wp post create --post_title="Meet Crash: The Heartbeat of ScriptHammer" \
                    --post_content="$crash_post_content" \
-                   --post_status="publish" \
+                   --post_status="future" \
                    --post_author="$creator_id" \
                    --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                   --post_date="$(get_publish_date $post_index)" \
                    --porcelain \
                    --path=/var/www/html)
+                   
+    post_index=$((post_index + 1))
                    
     if [ -n "$crash_post_id" ]; then
         echo "Created post about Crash with ID: $crash_post_id"
@@ -1327,15 +1368,23 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/chops/profile/">Chops' profile page</a> to learn more about our harmonic hacker.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Chops post (scheduled for $(get_publish_date $post_index))..."
     chops_post_id=$(wp post create --post_title="Meet Chops: ScriptHammer's Harmonic Hacker" \
                    --post_content="$chops_post_content" \
-                   --post_status="publish" \
+                   --post_status="future" \
                    --post_author="$creator_id" \
                    --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                   --post_date="$(get_publish_date $post_index)" \
                    --porcelain \
                    --path=/var/www/html)
+                   
+    post_index=$((post_index + 1))
                    
     if [ -n "$chops_post_id" ]; then
         echo "Created post about Chops with ID: $chops_post_id"
@@ -1426,15 +1475,23 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/reed/profile/">Reed's profile page</a> to learn more about our lyrical saxophonist.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Reed post (scheduled for $(get_publish_date $post_index))..."
     reed_post_id=$(wp post create --post_title="Meet Reed: The Lyrical Breeze of ScriptHammer" \
                   --post_content="$reed_post_content" \
-                  --post_status="publish" \
+                  --post_status="future" \
                   --post_author="$creator_id" \
                   --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                  --post_date="$(get_publish_date $post_index)" \
                   --porcelain \
                   --path=/var/www/html)
+                  
+    post_index=$((post_index + 1))
                   
     if [ -n "$reed_post_id" ]; then
         echo "Created post about Reed with ID: $reed_post_id"
@@ -1525,15 +1582,23 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/brass/profile/">Brass's profile page</a> to learn more about our trumpet virtuoso.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Brass post (scheduled for $(get_publish_date $post_index))..."
     brass_post_id=$(wp post create --post_title="Meet Brass: The Frontline Flame of ScriptHammer" \
                   --post_content="$brass_post_content" \
-                  --post_status="publish" \
+                  --post_status="future" \
                   --post_author="$creator_id" \
                   --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                  --post_date="$(get_publish_date $post_index)" \
                   --porcelain \
                   --path=/var/www/html)
+                  
+    post_index=$((post_index + 1))
                   
     if [ -n "$brass_post_id" ]; then
         echo "Created post about Brass with ID: $brass_post_id"
@@ -1624,15 +1689,23 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/verse/profile/">Verse's profile page</a> to learn more about our vocoder specialist.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Verse post (scheduled for $(get_publish_date $post_index))..."
     verse_post_id=$(wp post create --post_title="Meet Verse: The Soul Node of ScriptHammer" \
                   --post_content="$verse_post_content" \
-                  --post_status="publish" \
+                  --post_status="future" \
                   --post_author="$creator_id" \
                   --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                  --post_date="$(get_publish_date $post_index)" \
                   --porcelain \
                   --path=/var/www/html)
+                  
+    post_index=$((post_index + 1))
                   
     if [ -n "$verse_post_id" ]; then
         echo "Created post about Verse with ID: $verse_post_id"
@@ -1723,15 +1796,23 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/form/profile/">Form's profile page</a> to learn more about our architectural mind.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Form post (scheduled for $(get_publish_date $post_index))..."
     form_post_id=$(wp post create --post_title="Meet Form: The Architect of ScriptHammer" \
                   --post_content="$form_post_content" \
-                  --post_status="publish" \
+                  --post_status="future" \
                   --post_author="$creator_id" \
                   --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                  --post_date="$(get_publish_date $post_index)" \
                   --porcelain \
                   --path=/var/www/html)
+                  
+    post_index=$((post_index + 1))
                   
     if [ -n "$form_post_id" ]; then
         echo "Created post about Form with ID: $form_post_id"
@@ -1834,20 +1915,47 @@ if [ "$member_series_count" -lt "7" ]; then
 
 <!-- wp:paragraph -->
 <p>—Ivory, Melody Master of ScriptHammer</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p><strong>Visit <a href="http://172.26.72.153:8000/members/ivory/profile/">Ivory's profile page</a> to learn more about our melody master.</strong></p>
 <!-- /wp:paragraph -->"
 
+    echo "Creating Ivory post (scheduled for $(get_publish_date $post_index))..."
     ivory_post_id=$(wp post create --post_title="Meet Ivory: The Melody Master of ScriptHammer" \
                   --post_content="$ivory_post_content" \
-                  --post_status="publish" \
+                  --post_status="future" \
                   --post_author="$creator_id" \
                   --post_category="$MUSIC_CAT_ID,$MEMBERS_CAT_ID" \
+                  --post_date="$(get_publish_date $post_index)" \
                   --porcelain \
                   --path=/var/www/html)
+                  
+    post_index=$((post_index + 1))
                   
     if [ -n "$ivory_post_id" ]; then
         echo "Created post about Ivory with ID: $ivory_post_id"
         # Embed image in content
         embed_image_in_post_content "$ivory_post_id" "/usr/local/bin/devscripts/assets/Ivory.png" "Ivory"
+    fi
+    
+    # Now create the tour announcement post (last in the series)
+    echo "Creating tour announcement post (scheduled for $(get_publish_date $post_index))..."
+    # Create post with both categories at once - use a specific slug to avoid conflict with group slug
+    tour_id=$(wp post create --post_title="ScriptHammer Announces: The Aether Trail Tour of 1848" \
+                   --post_content="$tour_announcement_post_content" \
+                   --post_status="future" \
+                   --post_author="$creator_id" \
+                   --post_name="aether-trail-tour-1848" \
+                   --post_category="$MUSIC_CAT_ID,$TOUR_CAT_ID" \
+                   --post_date="$(get_publish_date $post_index)" \
+                   --porcelain \
+                   --path=/var/www/html)
+                   
+    if [ -n "$tour_id" ]; then
+        echo "Created tour announcement post with ID: $tour_id (scheduled for $(get_publish_date $post_index))"
+        # Verify categories
+        wp post term list $tour_id category --format=csv --path=/var/www/html || true
     fi
     
     echo "Created all 7 posts in Ivory's band member series"

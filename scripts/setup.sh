@@ -81,9 +81,15 @@ echo "Simple gamification plugin has been removed from this installation."
 echo "Verifying GamiPress plugins activation status:"
 wp plugin list --path=/var/www/html | grep -E 'gamipress|simple-gamification'
 
-# Install and activate BuddyX theme and recommended plugins
-echo "Activating BuddyX theme and installing recommended plugins..."
-wp theme activate buddyx --path=/var/www/html || handle_error $LINENO
+# Install BuddyX theme WITHOUT ACTIVATING - we'll activate the child theme later
+echo "Installing BuddyX theme and recommended plugins..."
+# Make sure BuddyX is available but don't activate it
+if ! wp theme is-installed buddyx --path=/var/www/html; then
+    echo "BuddyX theme not installed. Installing without activation..."
+    wp theme install buddyx --path=/var/www/html || handle_error $LINENO
+else
+    echo "BuddyX theme already installed."
+fi
 
 # Install the Metronome app plugin
 echo "Installing Metronome app plugin..."

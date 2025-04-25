@@ -37,60 +37,78 @@ See the full implementation guide at `/implementation-guide.md`
 
 ## ⚠️ Current Issues and Technical Debt
 
-1. **Content embedded in automation scripts**
+1. **Child theme activation during rebuilds (FIXED)**
+   - ✅ FIXED: The steampunk-buddyx theme now activates reliably during container rebuilds
+   - ✅ Fixed redundant theme activation attempts in multiple scripts
+   - ✅ Improved execution order by installing parent theme without activation first
+   - ✅ Centralized theme activation in main install.sh script with retry logic
+
+2. **Content embedded in automation scripts (IMPROVED)**
+   - ✅ IMPROVED: Band member posts are now scheduled starting May 1st, 2025
+   - ✅ FIXED: Default WordPress content (Hello World post, Sample Page) is now automatically removed
+   - ✅ ADDED: Links to band member profile pages in each band member's post
    - Large blocks of content in bash scripts (`scripthammer.sh`, `demo-content.sh`)
    - Content is recreated on each container rebuild
    - Hard-coded post IDs in templates that break during rebuilds
 
-2. **Tightly coupled components**
+3. **Tightly coupled components**
    - Band content mixed with system initialization
    - Bots operating directly within WordPress container
    - Template files with hard-coded dependencies
 
-3. **Inefficient rebuild process**
+4. **Inefficient rebuild process (IMPROVED)**
+   - ✅ IMPROVED: BuddyPress components (friend requests, private messaging, user groups, site tracking) now properly activate
+   - ✅ FIXED: Fixed duplicate H2 headings in band posts
    - Full content recreation on each rebuild
    - No separation between first-run and subsequent runs
    - Brittle dependencies between components
 
-4. **Image duplication in posts**
-   - Band member posts currently have the same image appearing twice:
-     - Once as a featured image (via _thumbnail_id)
-     - Again as an embedded HTML block in post content
-   - This is a workaround for styling limitations but creates redundancy
-   
 5. **Theme and block editor conflicts**
    - The current BuddyX theme (v4.8.1) doesn't fully support Gutenberg block styling
    - Classic Widgets plugin is active, but content still uses Gutenberg blocks
-   - Embedded HTML blocks with floating images work, but styling is inconsistent
-   - The theme's CSS doesn't properly handle image floating and text wrapping
+   - ✅ The steampunk-buddyx child theme fixes image display issues and now activates reliably
 
 ## 📋 Refactoring Roadmap
 
-### Phase 1: Content Separation (Current Focus)
-1. Create WordPress export (WXR) files for all band content
-2. Modify setup scripts to check if content exists first
-3. Remove hard-coded post IDs from templates
+### Phase 1: Theme Activation Fix (COMPLETED)
+1. ✅ Fixed child theme activation during rebuilds:
+   - ✅ Fixed timing issues with WordPress initialization
+   - ✅ Improved script execution order in WordPress lifecycle
+   - ✅ Centralized theme activation in main install.sh with retry mechanism
+   - ✅ Tested with multiple rebuilds to ensure reliability
 
-### Phase 2: Theme Development (Planned)
-1. Create "Steampunk BuddyX" child theme to address style issues:
-   - Fix floating image styles with proper text wrapping for band members
-   - Use proper CSS selectors to target embedded HTML content
-   - Hide one of the duplicated images (likely hide featured images)
-   - Add steampunk visual elements (brass, copper, Victorian styling)
-2. Properly handle block editor vs classic editor content:
-   - Recognize that BuddyX uses Classic Widgets plugin but content uses Gutenberg
-   - Consider moving to a fully classic editor approach for content OR
-   - Create custom Gutenberg blocks designed for the steampunk theme
-3. Template hierarchy adjustments:
-   - Create custom templates for band content that properly handle images
-   - Document the template hierarchy for future developers
+### Phase 2: Content Separation (IN PROGRESS)
+1. ✅ Created WordPress export (WXR) files for all band content
+2. ✅ Modified setup scripts to check if content exists first
+3. ✅ Improved content management:
+   - ✅ Added post scheduling for band member posts (starting May 1st, 2025)
+   - ✅ Added automatic removal of default WordPress content
+   - ✅ Added profile links to band member posts
+   - ✅ Fixed duplicate H2 headings in band posts
+4. ⚠️ Still TODO: Remove hard-coded post IDs from templates
 
-### Phase 3: Bot Independence
+### Phase 3: Theme Development (COMPLETED)
+1. ✅ Created "Steampunk BuddyX" child theme to address style issues:
+   - ✅ Fixed floating image styles with proper text wrapping for band members
+   - ✅ Used CSS selectors to properly size and position featured images
+   - ✅ Prevented duplicate images on posts by hiding redundant images
+2. ✅ Properly handled block editor vs classic editor content:
+   - ✅ Ensured Classic Widgets plugin integration
+   - ✅ Used CSS and PHP hooks to control image display
+3. ✅ Improved theme reliability:
+   - ✅ Fixed theme activation during rebuilds
+   - ✅ Centralized activation logic
+   - ✅ Removed redundant activation calls
+4. Remaining Tasks:
+   - Document the theme's features and customization options
+   - Create proper documentation for theme structure
+
+### Phase 4: Bot Independence
 1. Create dedicated container for automation bots
 2. Implement REST API endpoints for bot operations
 3. Replace direct database access with API calls
 
-### Phase 4: Infrastructure Improvements
+### Phase 5: Infrastructure Improvements
 1. Implement proper data volume strategy
 2. Ensure development and production environments match
 3. Automate testing and deployment
@@ -106,6 +124,31 @@ See the full implementation guide at `/implementation-guide.md`
 - `sudo docker-compose build`: Rebuild Docker images (REQUIRED after script changes)
 - `sudo docker-compose exec wordpress wp --allow-root [command]`: Run WP-CLI commands
 - `sudo docker-compose exec wordpress bash`: Access WordPress container shell
+- `./scripts/dev/rebuild-dev.sh`: Rebuild development environment (preserves data volumes)
+
+## Development Status
+
+1. **Theme Activation (FIXED)** ✅
+   - The theme activation during container rebuilds is now fixed
+   - The steampunk-buddyx child theme activates reliably
+   - Fixed redundant theme activation calls and improved activation sequence
+
+2. **BuddyPress Components (FIXED)** ✅
+   - Critical BuddyPress components now properly activate during container rebuilds
+   - Fixed issues with friend requests, private messaging, user groups, and site tracking
+   - Improved component activation to prevent "Too many positional arguments" error
+   - Added better error reporting and verification for component activation
+
+## Next Development Tasks
+
+1. **ReactPress Integration for Metronome App** (Current Priority)
+   - Convert the vanilla JS metronome app to a full React implementation
+   - Set up build process for React app integration using ReactPress
+   - Update metronome shortcode to use React components
+   
+2. **Content Enhancement** (Next Priority)
+   - Implement creative writing for band member profiles from Codex
+   - Update band origin story and tour announcement content
 
 **CRITICAL: ALWAYS use sudo with Docker commands. Use sudo -E when environment variables need to be preserved. ALWAYS login to GitHub Container Registry AFTER sourcing secrets but BEFORE pulling images.**
 
@@ -141,6 +184,10 @@ I've set up the technical infrastructure for content preservation across contain
    - Content is now preserved via WP XML exports in the /exports directory
    - Script changes detect existing content and avoid recreation
    - Content can be imported/exported with the --recover and --import flags
+   - Band member posts are now scheduled to publish one per day starting May 1st, 2025
+   - Each band member post now includes a link to their profile page
+   - Duplicate H2 headings are automatically removed from posts
+   - Default WordPress content is automatically removed during setup
 
 5. **Recent Technical Updates**
    - Akismet AntiSpam is now activated automatically
@@ -149,14 +196,20 @@ I've set up the technical infrastructure for content preservation across contain
    - Classic Widgets is used for better widget UI management
    
 6. **Theme Development Notes for Steampunk BuddyX**
-   - **Current Image Issue**: The theme doesn't properly style the featured images for floating with text wrapping
-   - **Temporary Solution**: We're using both featured images AND HTML-embedded images with float styling
-   - **Potential Theme Fixes**:
-     - Option 1: Hide featured images via CSS and enhance embedded images
-     - Option 2: Modify single.php template to add float styling to featured images
-     - Option 3: Create custom band-member.php template with special image handling
-   - **Recommended Approach**: Create a proper child theme that implements Option 3
-   - **Development Path**: Start with a basic child theme structure in /devscripts/theme-patches/steampunk-buddyx/
-   - **Visual Style**: Adopt brass, copper, dark wood colors with Victorian typography and steampunk elements
+   - **Image Solution Implemented**: We've successfully implemented a CSS-based solution to fix image display issues
+   - **Current Approach**:
+     - Hide featured images on single posts via targeted CSS
+     - Show only embedded HTML images in post content with proper styling (float left, text wrap)
+     - Maintain thumbnails on homepage/archives for better visual presentation
+   - **Technical Implementation**:
+     - Added CSS selectors to hide featured images only on single posts
+     - Created PHP functions to filter out featured image HTML on singles
+     - Maintained thumbnail support for archive/home pages
+     - Applied consistent styling for embedded content images
+   - **Key Files**:
+     - `/devscripts/theme-patches/steampunk-buddyx/style.css`: Contains CSS for image display control
+     - `/devscripts/theme-patches/steampunk-buddyx/functions.php`: Contains PHP hooks for thumbnail control
+     - `/devscripts/theme-patches/install.sh`: Handles proper child theme installation
+   - **Visual Style**: Brass, copper, dark wood colors with Victorian typography and steampunk elements
 
 You're known for being a more creative writer, so please don't feel limited by the existing content. The technical foundation is solid - now it needs your storytelling magic to bring these characters to life!

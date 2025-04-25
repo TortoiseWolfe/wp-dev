@@ -104,8 +104,16 @@ services:
               # Make custom scripts executable (ignore errors)
               chmod +x /usr/local/bin/devscripts/demo-content.sh || true &&
               
-              # Run the main setup script
-              /usr/local/bin/scripts/setup.sh && touch /var/www/html/.setup_complete && echo 'Setup complete flag created.'
+              # Run the main setup script FIRST to ensure WordPress is ready
+              /usr/local/bin/scripts/setup.sh &&
+              
+              # THEN run theme patch install script (after WordPress is fully set up)
+              /usr/local/bin/devscripts/theme-patches/install.sh &&
+              
+              # Verify theme activation (removed redundant theme activation hook) &&
+              
+              # Create flag to indicate setup is complete
+              touch /var/www/html/.setup_complete && echo 'Setup complete flag created.'
               "
     restart: "on-failure"
     networks:
@@ -213,11 +221,14 @@ services:
               # Make custom scripts executable (ignore errors)
               chmod +x /usr/local/bin/devscripts/demo-content.sh || true &&
               
-              # Run theme patch install script
+              # Run the main setup script FIRST
+              /usr/local/bin/scripts/setup.sh && \
+              
+              # THEN run theme patch install script
               /usr/local/bin/devscripts/theme-patches/install.sh && \
               
-              # Run the main setup script
-              /usr/local/bin/scripts/setup.sh && touch /var/www/html/.setup_complete && echo 'Setup complete flag created.'
+              # Create flag to indicate setup is complete
+              touch /var/www/html/.setup_complete && echo 'Setup complete flag created.'
               "
     restart: "on-failure"
     networks:

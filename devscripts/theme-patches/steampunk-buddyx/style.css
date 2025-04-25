@@ -1,0 +1,71 @@
+/*
+Theme Name: Steampunk BuddyX
+Theme URI: https://scripthammer.com
+Description: A steampunk-styled child theme for BuddyX with better image handling
+Author: Claude
+Author URI: https://claude.ai
+Template: buddyx
+Version: 1.0.0
+Text Domain: steampunk-buddyx
+*/
+
+/* Import parent theme styles */
+@import url('../buddyx/style.css');
+
+/* TARGETED HIDE: Only hide featured images on single posts */
+body.single .post-thumbnail,
+body.single .entry-media-image,
+body.single .buddyx-post-thumbnail,
+body.single .buddyx-article-list-thumbnail,
+body.single .buddyx-article-grid-thumbnail,
+body.single .single-featured-image-header,
+body.single .entry-featured-image,
+body.single .buddyx-post-section .entry-media-image,
+body.single .buddyx-post-section.has-featured-image .entry-media-image,
+body.single .buddyx-post-section .post-thumbnail,
+body.single .buddyx-post-section,
+body.single .wp-post-image,
+body.single .buddyx-post-section.buddyx-section-title-above.has-featured-image .entry-media-image,
+body.single div.buddyx-post-section div.entry-media-image,
+body.single div.buddyx-post-section.has-featured-image div.entry-media-image,
+body.single div.entry-media-image,
+body.single .has-featured-image,
+body.single .buddyx-section-title-above {
+    display: none !important;
+}
+
+/* ONLY SHOW IMAGES IN POST CONTENT */
+article .entry-content img, 
+article .entry-content .wp-block-html img,
+.buddyx-article--list .entry-content img,
+.home .entry-content img,
+.blog .entry-content img,
+.archive .entry-content img {
+    display: block !important;
+    max-width: 350px !important;
+    height: auto !important;
+    float: left !important;
+    margin: 0 20px 20px 0 !important;
+    border-radius: 8px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: auto !important;
+}
+
+/* Style the embedded HTML image in post content */
+.wp-block-html img {
+    max-width: 350px !important;
+    height: auto !important;
+    float: left !important;
+    margin: 0 20px 20px 0 !important;
+    border-radius: 8px !important;
+}
+
+/* Improve text wrapping around images */
+.entry-content p {
+    overflow: auto;
+    clear: none;
+}

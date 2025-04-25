@@ -140,6 +140,8 @@ RUN if [ -f /usr/local/bin/scripts/dev/build-react-app.sh ]; then chmod +x /usr/
 # Copy the devscripts directory
 COPY devscripts /usr/local/bin/devscripts
 RUN chmod +x /usr/local/bin/devscripts/demo-content.sh /usr/local/bin/devscripts/scripthammer.sh && \
+    chmod +x /usr/local/bin/devscripts/theme-patches/install.sh && \
+    chmod +x /usr/local/bin/devscripts/theme-patches/steampunk-buddyx/install.sh && \
     chmod 644 /usr/local/bin/devscripts/metronome-app.php
 
 # Switch to non‑root user provided by the official WordPress image
