@@ -12,6 +12,81 @@ Text Domain: steampunk-buddyx
 /* Import parent theme styles */
 @import url('../buddyx/style.css');
 
+/* ===== CUSTOM BACKGROUND COLOR RULES ===== */
+/* Apply sepia background to the entire page and all containers */
+html, body, 
+#page, .site, 
+#content, #primary, 
+.buddyx-content, 
+main#main, 
+.entry-wrapper, 
+.entry-content-wrapper, 
+.entry-content,
+.buddyx-article, 
+.site-wrapper-frame, 
+.section-title, 
+.white-section, 
+.single article,
+.buddyx-posts-list, 
+.buddyx-posts-list__item, 
+.container-fluid, 
+.site-footer, 
+.buddyx-header {
+    background-color: #e6dbc9 !important; /* Darker sepia tone */
+}
+
+/* Apply slightly darker background to UI elements */
+.site-header, 
+.site-branding, 
+.site-branding-inner,
+.site-logo-wrapper, 
+nav, .navigation, .navbar, 
+.site-info, 
+.footer-widget, .footer-wrap,
+.buddyx-search-results, 
+.popup-content, 
+.card-header, .card-footer, 
+.panel {
+    background-color: #d9cdb9 !important; /* Slightly darker for contrast */
+    opacity: 1 !important;
+}
+
+/* Fix for header white bars */
+.site-header-wrapper {
+    background-color: #d9cdb9 !important;
+    box-shadow: 0 1px 0 0 rgba(206, 206, 206, 0.05), 0 5px 10px 0 rgba(132, 132, 132, 0.15) !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+}
+
+/* Override all color variables */
+:root {
+    --buddyx-background-color: #e6dbc9 !important;
+    --buddyx-page-background-color: #e6dbc9 !important;
+    --buddyx-global-background-color: #e6dbc9 !important;
+    --buddyx-content-background-color: #e6dbc9 !important;
+    --buddyx-article-background-color: #e6dbc9 !important;
+    --buddyx-panel-background-color: #d9cdb9 !important;
+    --buddyx-block-background-color: #e6dbc9 !important;
+    --buddyx-content-area-background-color: #e6dbc9 !important;
+    --buddyx-card-background-color: #e6dbc9 !important;
+    --buddyx-widget-background-color: #e6dbc9 !important;
+    --buddyx-header-background-color: #d9cdb9 !important;
+    --buddyx-footer-background-color: #d9cdb9 !important;
+    --buddyx-section-background-color: #e6dbc9 !important;
+    --buddyx-white-color: #f0e8d9 !important;
+    --buddyx-light-color: #f0e8d9 !important;
+    --buddyx-input-background-color: #f0e8d9 !important;
+    
+    /* Text and link colors */
+    --buddyx-text-color: #3d3223; /* Darker brown text */
+    --buddyx-link-color: #805c34; /* Darker copper for links */
+    --buddyx-link-hover-color: #5c4027; /* Even darker on hover */
+}
+
 /* TARGETED HIDE: Only hide featured images on single posts */
 body.single .post-thumbnail,
 body.single .entry-media-image,

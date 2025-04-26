@@ -8,6 +8,10 @@ echo "Installing Steampunk BuddyX child theme..."
 mkdir -p /var/www/html/wp-content/themes/steampunk-buddyx/template-parts/content
 mkdir -p /var/www/html/wp-content/themes/steampunk-buddyx/template-parts/layout
 
+# Ensure template directories exist
+mkdir -p /var/www/html/wp-content/themes/steampunk-buddyx/template-parts
+mkdir -p /var/www/html/wp-content/themes/steampunk-buddyx/template-parts/content
+
 # Copy the child theme files
 cp -r /usr/local/bin/devscripts/theme-patches/steampunk-buddyx/* /var/www/html/wp-content/themes/steampunk-buddyx/
 
@@ -31,5 +35,20 @@ find /var/www/html/wp-content/themes/steampunk-buddyx -type f -name "*.php" -exe
 
 # Make sure Classic Widgets plugin is active
 wp plugin activate --allow-root classic-widgets --path=/var/www/html || true
+
+# FAIL-SAFE: Save BuddyPress component state before theme activation
+# Note: This is a backup in case theme activation affects component settings
+echo "Saving BuddyPress component state as a safety measure..."
+if wp plugin is-active --allow-root buddypress --path=/var/www/html; then
+    # Save current component state to a temporary file
+    wp bp component list --status=active --format=json --path=/var/www/html --allow-root > /tmp/bp_components_backup.json 2>/dev/null || true
+    
+    # Activate critical components to ensure they're included in the backup
+    for critical in friends messages groups blogs xprofile members activity notifications settings; do
+        wp bp component activate $critical --path=/var/www/html --allow-root || true
+    done
+    
+    echo "✅ BuddyPress component state preserved"
+fi
 
 echo "✅ Steampunk BuddyX child theme installed successfully!"

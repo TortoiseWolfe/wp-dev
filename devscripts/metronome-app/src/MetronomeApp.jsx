@@ -370,15 +370,6 @@ const MetronomeApp = () => {
 
   return (
     <div className="p-4 max-w-3xl mx-auto rounded-lg shadow-md" style={{ backgroundColor: '#d9cdb9', color: '#3d3223', boxShadow: '0 4px 6px rgba(61,50,35,0.3)' }}>
-      <style>
-        {`
-        @keyframes pulse-play {
-          0% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 90, 54, 0.8), 0 0 20px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.3); }
-          50% { transform: scale(1.05); box-shadow: 0 0 16px rgba(255, 90, 54, 1), 0 0 24px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.5); }
-          100% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 90, 54, 0.8), 0 0 20px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.3); }
-        }
-        `}
-      </style>
       <h1 className="text-2xl font-bold mb-4 text-center" style={{ color: '#3d3223' }}>4-Track Metronome</h1>
       
       {/* Preset Selector */}
@@ -410,18 +401,17 @@ const MetronomeApp = () => {
           <button 
             onClick={togglePlay}
             style={{
-              backgroundColor: isPlaying ? '#3b7adb' : '#ff5a36', 
-              color: '#ffffff',
+              backgroundColor: isPlaying ? '#9b4729' : '#e2a240', 
+              color: '#f0e8d9',
               padding: '0.5rem',
               borderRadius: '9999px',
-              boxShadow: '0 0 12px rgba(255, 90, 54, 0.9), 0 0 20px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.3)',
-              border: '3px solid #ffffff',
-              minHeight: '60px',
-              minWidth: '60px',
+              boxShadow: '0 0 8px rgba(226, 162, 64, 0.9), 0 0 15px rgba(0, 0, 0, 0.4)',
+              border: '2px solid #f0e8d9',
+              minHeight: '48px',
+              minWidth: '48px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              animation: isPlaying ? 'none' : 'pulse-play 2s infinite'
+              justifyContent: 'center'
             }}
           >
             {isPlaying ? <Pause size={24} /> : <Play size={24} />}

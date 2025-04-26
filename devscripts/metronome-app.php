@@ -34,117 +34,124 @@ function render_scripthammer_react_placeholder() {
     $instance_id = 'metronome-' . uniqid();
     
     // Interactive metronome app with working functionality
-    $output = '<div id="' . $instance_id . '" class="metronome-app" style="max-width: 800px; margin: 20px auto; background-color: #f3f4f6; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-family: sans-serif;">';
+    $output = '<div id="' . $instance_id . '" class="metronome-app" style="max-width: 800px; margin: 20px auto; background-color: #d9cdb9; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(61,50,35,0.3); font-family: sans-serif;">';
     
     // Title
-    $output .= '<h1 style="text-align: center; margin-top: 0; color: #111827;">Interactive Metronome</h1>';
+    $output .= '<h1 style="text-align: center; margin-top: 0; color: #3d3223;">Interactive Metronome</h1>';
     
     // Pattern selector
     $output .= '<div style="margin-bottom: 20px;">';
-    $output .= '<label><strong>Beat Pattern:</strong></label>';
+    $output .= '<label style="color: #3d3223;"><strong>Beat Pattern:</strong></label>';
     $output .= '<div class="pattern-buttons" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;">';
-    $output .= '<button data-pattern="basic" style="padding: 8px 0; background-color: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Basic Rock</button>';
-    $output .= '<button data-pattern="disco" style="padding: 8px 0; background-color: #e5e7eb; border: none; border-radius: 4px; cursor: pointer;">Disco</button>';
-    $output .= '<button data-pattern="hiphop" style="padding: 8px 0; background-color: #e5e7eb; border: none; border-radius: 4px; cursor: pointer;">Hip Hop</button>';
-    $output .= '<button data-pattern="jazz" style="padding: 8px 0; background-color: #e5e7eb; border: none; border-radius: 4px; cursor: pointer;">Jazz</button>';
-    $output .= '<button data-pattern="waltz" style="padding: 8px 0; background-color: #e5e7eb; border: none; border-radius: 4px; cursor: pointer;">Waltz (3/4)</button>';
-    $output .= '<button data-pattern="custom" style="padding: 8px 0; background-color: #e5e7eb; border: none; border-radius: 4px; cursor: pointer;">Custom</button>';
+    $output .= '<button data-pattern="basic" style="padding: 8px 0; background-color: #805c34; color: #f0e8d9; border: none; border-radius: 4px; cursor: pointer;">Basic Rock</button>';
+    $output .= '<button data-pattern="disco" style="padding: 8px 0; background-color: #e6dbc9; color: #3d3223; border: 1px solid #805c34; border-radius: 4px; cursor: pointer;">Disco</button>';
+    $output .= '<button data-pattern="hiphop" style="padding: 8px 0; background-color: #e6dbc9; color: #3d3223; border: 1px solid #805c34; border-radius: 4px; cursor: pointer;">Hip Hop</button>';
+    $output .= '<button data-pattern="jazz" style="padding: 8px 0; background-color: #e6dbc9; color: #3d3223; border: 1px solid #805c34; border-radius: 4px; cursor: pointer;">Jazz</button>';
+    $output .= '<button data-pattern="waltz" style="padding: 8px 0; background-color: #e6dbc9; color: #3d3223; border: 1px solid #805c34; border-radius: 4px; cursor: pointer;">Waltz (3/4)</button>';
+    $output .= '<button data-pattern="custom" style="padding: 8px 0; background-color: #e6dbc9; color: #3d3223; border: 1px solid #805c34; border-radius: 4px; cursor: pointer;">Custom</button>';
     $output .= '</div>';
     $output .= '</div>';
     
     // Tempo controls
     $output .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">';
-    $output .= '<span class="tempo-display" style="font-size: 18px; font-weight: bold;">Tempo: 120 BPM</span>';
-    $output .= '<button class="play-button" style="background-color: #10b981; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 16px; cursor: pointer;">▶</button>';
+    $output .= '<span class="tempo-display" style="font-size: 18px; font-weight: bold; color: #3d3223;">Tempo: 120 BPM</span>';
+    $output .= '<button class="play-button" style="background-color: #ff5a36; color: #ffffff; border: 3px solid #ffffff; width: 60px; height: 60px; border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: 0 0 12px rgba(255, 90, 54, 0.9), 0 0 20px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.3); text-align: center; line-height: 54px; position: relative; overflow: hidden; animation: pulse-play 2s infinite;">▶</button>
+    <style>
+    @keyframes pulse-play {
+      0% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 90, 54, 0.8), 0 0 20px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.3); }
+      50% { transform: scale(1.05); box-shadow: 0 0 16px rgba(255, 90, 54, 1), 0 0 24px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.5); }
+      100% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 90, 54, 0.8), 0 0 20px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.3); }
+    }
+    </style>';
     $output .= '</div>';
-    $output .= '<input type="range" class="tempo-slider" min="60" max="200" value="120" style="width: 100%; margin-bottom: 20px;">';
+    $output .= '<input type="range" class="tempo-slider" min="60" max="200" value="120" style="width: 100%; margin-bottom: 20px; accent-color: #805c34;">';
     
     // Track 1: Kick
-    $output .= '<div class="track" data-track="kick" style="background-color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">';
+    $output .= '<div class="track" data-track="kick" style="background-color: #f0e8d9; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(61,50,35,0.2); border: 1px solid #c1b59e;">';
     $output .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">';
     $output .= '<div style="display: flex; align-items: center;">';
-    $output .= '<button class="mute-button" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #3b82f6; color: white; margin-right: 8px; font-size: 12px;">🔊</button>';
-    $output .= '<span>Kick</span>';
+    $output .= '<button class="mute-button" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #805c34; color: #f0e8d9; margin-right: 8px; font-size: 12px;">🔊</button>';
+    $output .= '<span style="color: #3d3223;">Kick</span>';
     $output .= '</div>';
-    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.8" style="width: 100px;">';
+    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.8" style="width: 100px; accent-color: #805c34;">';
     $output .= '</div>';
     $output .= '<div class="beat-cells" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;">';
-    $output .= '<div class="beat active" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
     $output .= '</div>';
     $output .= '</div>';
     
     // Track 2: Snare
-    $output .= '<div class="track" data-track="snare" style="background-color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">';
+    $output .= '<div class="track" data-track="snare" style="background-color: #f0e8d9; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(61,50,35,0.2); border: 1px solid #c1b59e;">';
     $output .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">';
     $output .= '<div style="display: flex; align-items: center;">';
-    $output .= '<button class="mute-button" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #3b82f6; color: white; margin-right: 8px; font-size: 12px;">🔊</button>';
-    $output .= '<span>Snare</span>';
+    $output .= '<button class="mute-button" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #805c34; color: #f0e8d9; margin-right: 8px; font-size: 12px;">🔊</button>';
+    $output .= '<span style="color: #3d3223;">Snare</span>';
     $output .= '</div>';
-    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.8" style="width: 100px;">';
+    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.8" style="width: 100px; accent-color: #805c34;">';
     $output .= '</div>';
     $output .= '<div class="beat-cells" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;">';
-    $output .= '<div class="beat" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
     $output .= '</div>';
     $output .= '</div>';
     
     // Track 3: Hi-Hat
-    $output .= '<div class="track" data-track="hihat" style="background-color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">';
+    $output .= '<div class="track" data-track="hihat" style="background-color: #f0e8d9; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(61,50,35,0.2); border: 1px solid #c1b59e;">';
     $output .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">';
     $output .= '<div style="display: flex; align-items: center;">';
-    $output .= '<button class="mute-button" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #3b82f6; color: white; margin-right: 8px; font-size: 12px;">🔊</button>';
-    $output .= '<span>Hi-Hat</span>';
+    $output .= '<button class="mute-button" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #805c34; color: #f0e8d9; margin-right: 8px; font-size: 12px;">🔊</button>';
+    $output .= '<span style="color: #3d3223;">Hi-Hat</span>';
     $output .= '</div>';
-    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.6" style="width: 100px;">';
+    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.6" style="width: 100px; accent-color: #805c34;">';
     $output .= '</div>';
     $output .= '<div class="beat-cells" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;">';
-    $output .= '<div class="beat active" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
-    $output .= '<div class="beat active" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #3b82f6; border: 2px solid #2563eb; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
+    $output .= '<div class="beat active" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #805c34; border: 2px solid #5c4027; cursor: pointer;"></div>';
     $output .= '</div>';
     $output .= '</div>';
     
     // Track 4: Ride
-    $output .= '<div class="track" data-track="ride" style="background-color: white; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">';
+    $output .= '<div class="track" data-track="ride" style="background-color: #f0e8d9; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(61,50,35,0.2); border: 1px solid #c1b59e;">';
     $output .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">';
     $output .= '<div style="display: flex; align-items: center;">';
-    $output .= '<button class="mute-button muted" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #d1d5db; color: white; margin-right: 8px; font-size: 12px;">M</button>';
-    $output .= '<span>Ride</span>';
+    $output .= '<button class="mute-button muted" style="width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #c1b59e; color: #3d3223; margin-right: 8px; font-size: 12px;">M</button>';
+    $output .= '<span style="color: #3d3223;">Ride</span>';
     $output .= '</div>';
-    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.5" style="width: 100px;">';
+    $output .= '<input type="range" class="volume-slider" min="0" max="1" step="0.1" value="0.5" style="width: 100px; accent-color: #805c34;">';
     $output .= '</div>';
     $output .= '<div class="beat-cells" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;">';
-    $output .= '<div class="beat" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
-    $output .= '<div class="beat" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #e5e7eb; border: 2px solid #d1d5db; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="0" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="1" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="2" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="3" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="4" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="5" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="6" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
+    $output .= '<div class="beat" data-beat="7" style="height: 30px; border-radius: 4px; background-color: #e6dbc9; border: 2px solid #c1b59e; cursor: pointer;"></div>';
     $output .= '</div>';
     $output .= '</div>';
     
     // Instructions
-    $output .= '<div style="text-align: center; font-size: 14px; color: #6b7280; margin-top: 20px;">';
+    $output .= '<div style="text-align: center; font-size: 14px; color: #3d3223; margin-top: 20px;">';
     $output .= 'Click on cells to toggle beats on/off. Use the mute buttons to silence tracks.';
     $output .= '</div>';
     
@@ -228,10 +235,12 @@ function render_scripthammer_react_placeholder() {
             muteButton.addEventListener("click", () => {
                 muteButton.classList.toggle("muted");
                 if (muteButton.classList.contains("muted")) {
-                    muteButton.style.backgroundColor = "#d1d5db";
+                    muteButton.style.backgroundColor = "#c1b59e";
+                    muteButton.style.color = "#3d3223";
                     muteButton.textContent = "M";
                 } else {
-                    muteButton.style.backgroundColor = "#3b82f6";
+                    muteButton.style.backgroundColor = "#805c34";
+                    muteButton.style.color = "#f0e8d9";
                     muteButton.textContent = "🔊";
                 }
             });
@@ -241,11 +250,11 @@ function render_scripthammer_react_placeholder() {
                 cell.addEventListener("click", () => {
                     cell.classList.toggle("active");
                     if (cell.classList.contains("active")) {
-                        cell.style.backgroundColor = "#3b82f6";
-                        cell.style.borderColor = "#2563eb";
+                        cell.style.backgroundColor = "#805c34";
+                        cell.style.borderColor = "#5c4027";
                     } else {
-                        cell.style.backgroundColor = "#e5e7eb";
-                        cell.style.borderColor = "#d1d5db";
+                        cell.style.backgroundColor = "#e6dbc9";
+                        cell.style.borderColor = "#c1b59e";
                     }
                 });
             });
@@ -259,11 +268,13 @@ function render_scripthammer_react_placeholder() {
                 
                 // Update button styles
                 patternButtons.forEach(btn => {
-                    btn.style.backgroundColor = "#e5e7eb";
-                    btn.style.color = "#000";
+                    btn.style.backgroundColor = "#e6dbc9";
+                    btn.style.color = "#3d3223";
+                    btn.style.border = "1px solid #805c34";
                 });
-                button.style.backgroundColor = "#3b82f6";
-                button.style.color = "#fff";
+                button.style.backgroundColor = "#805c34";
+                button.style.color = "#f0e8d9";
+                button.style.border = "none";
             });
         });
         
@@ -278,11 +289,14 @@ function render_scripthammer_react_placeholder() {
             if (isPlaying) {
                 currentStep = 0;
                 playButton.textContent = "⏸";
-                playButton.style.backgroundColor = "#ef4444";
+                playButton.style.backgroundColor = "#3b7adb"; // Blue for pause
+                playButton.style.animation = "none"; // Stop animation when playing
+                playButton.style.transform = "scale(1)"; // Reset scale
                 playTick();
             } else {
                 playButton.textContent = "▶";
-                playButton.style.backgroundColor = "#10b981";
+                playButton.style.backgroundColor = "#ff5a36"; // Bright orange-red for high visibility
+                playButton.style.animation = "pulse-play 2s infinite"; // Restart animation
                 window.clearTimeout(timerID);
             }
         }
@@ -305,8 +319,8 @@ function render_scripthammer_react_placeholder() {
                     beatCells.forEach((cell, index) => {
                         const isActive = pattern[trackType][index] === 1;
                         cell.classList.toggle("active", isActive);
-                        cell.style.backgroundColor = isActive ? "#3b82f6" : "#e5e7eb";
-                        cell.style.borderColor = isActive ? "#2563eb" : "#d1d5db";
+                        cell.style.backgroundColor = isActive ? "#805c34" : "#e6dbc9";
+                        cell.style.borderColor = isActive ? "#5c4027" : "#c1b59e";
                     });
                 }
             });
@@ -373,7 +387,7 @@ function render_scripthammer_react_placeholder() {
             // Add highlight to current step
             const currentBeats = container.querySelectorAll(`.beat[data-beat="${currentStep}"]`);
             currentBeats.forEach(beat => {
-                beat.style.boxShadow = "0 0 0 2px rgba(251, 191, 36, 0.8)";
+                beat.style.boxShadow = "0 0 0 2px rgba(153, 101, 21, 0.9)"; // Golden brown highlight
             });
         }
         

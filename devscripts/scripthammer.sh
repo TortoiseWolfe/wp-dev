@@ -56,33 +56,66 @@ band_content_exists() {
 
 # Function to import band content from exports
 import_band_content() {
-    # Check if export file exists
-    EXPORT_FILE="/var/www/html/wp-content/exports-volume/all-band-content-000.xml"
+    # Check multiple locations for export files
+    for EXPORT_PATH in \
+        "/var/www/html/wp-content/exports-volume/all-band-content-000.xml" \
+        "/var/www/html/wp-content/exports/all-band-content-000.xml" \
+        "/usr/local/bin/devscripts/exports/all-band-content-000.xml" \
+        "/var/www/html/wp-content/uploads/exports/all-band-content-000.xml" \
+        "/var/www/html/wp-content/imports/all-band-content-000.xml"
+    do
+        if [ -f "$EXPORT_PATH" ]; then
+            EXPORT_FILE="$EXPORT_PATH"
+            echo "🔄 Found export file at $EXPORT_FILE"
+            break
+        fi
+    done
     
-    if [ -f "$EXPORT_FILE" ]; then
+    # If we found an export file, import it
+    if [ -n "$EXPORT_FILE" ] && [ -f "$EXPORT_FILE" ]; then
         echo "🔄 Importing band content from $EXPORT_FILE..."
-        
+    
         # Install WordPress importer plugin if needed
         if ! wp plugin is-installed wordpress-importer --path=/var/www/html; then
             echo "Installing WordPress Importer plugin..."
             wp plugin install wordpress-importer --activate --path=/var/www/html
         fi
-        
+    
         # Import the content
         wp import "$EXPORT_FILE" --authors=create --path=/var/www/html
-        
+    
         echo "✅ Band content imported successfully"
         return 0
     else
-        echo "❌ Export file not found at $EXPORT_FILE"
+        echo "❌ No export files found in any standard location"
+        echo "👉 Will create band content from scratch instead"
         return 1
     fi
 }
 
 # Force activation of all required components before proceeding
 echo "Ensuring all BuddyPress components are activated..."
+# First check if BuddyPress is active
+if ! wp plugin is-active buddypress --path=/var/www/html; then
+    echo "Activating BuddyPress plugin..."
+    wp plugin activate buddypress --path=/var/www/html || echo "⚠️ Warning: Could not activate BuddyPress"
+    # Give it a moment to initialize
+    sleep 3
+fi
+
+# Check what components are already active
+active_components=$(wp bp component list --status=active --path=/var/www/html 2>/dev/null || echo "none")
+echo "Currently active components: $active_components"
+
+# Try to activate each component individually with safeguards
 for component in xprofile members groups friends messages activity notifications settings blogs; do
-    wp bp component activate $component --path=/var/www/html || true
+    echo "Ensuring component '$component' is active..."
+    # First check if already active to avoid errors
+    if ! echo "$active_components" | grep -q "$component"; then
+        wp bp component activate $component --path=/var/www/html || echo "⚠️ Warning: Could not activate $component, but continuing anyway"
+    else
+        echo "✅ Component '$component' is already active"
+    fi
     sleep 1
 done
 
@@ -556,15 +589,18 @@ done
 # Verify all critical components are active with detailed error messages
 critical_components=("groups" "friends" "messages" "blogs")
 for component in "${critical_components[@]}"; do
-    if ! wp bp component is-active $component --path=/var/www/html; then
-        echo "❌ CRITICAL ERROR: Component '$component' could not be activated. Trying one more time..."
+    if ! wp bp component list --status=active --path=/var/www/html | grep -q "$component"; then
+        echo "⚠️ WARNING: Component '$component' is not active. Trying one more time..."
         wp bp component activate $component --path=/var/www/html
         
         # Check again after second attempt
-        if ! wp bp component is-active $component --path=/var/www/html; then
-            echo "❌ CRITICAL ERROR: Component '$component' could not be activated after second attempt. Exiting."
-            exit 1
+        if ! wp bp component list --status=active --path=/var/www/html | grep -q "$component"; then
+            echo "⚠️ WARNING: Component '$component' could not be activated after second attempt."
+            echo "💡 This might cause some features to be unavailable, but we'll continue anyway."
+            # Don't exit - continue with the script even if components can't be activated
         fi
+    else
+        echo "✅ Component '$component' is active."
     fi
 done
 

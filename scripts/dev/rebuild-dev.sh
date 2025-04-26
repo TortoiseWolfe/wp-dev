@@ -75,15 +75,27 @@ source ./scripts/dev/setup-local-dev.sh
 echo "Step 4: Starting development environment..."
 docker-compose up -d wordpress wp-setup db
 
-echo "Step 5: Watching logs to monitor setup progress..."
-echo "Press Ctrl+C when setup is complete (you see 'WordPress init process complete')"
-docker-compose logs -f wordpress wp-setup
-
-echo ""
-echo "Step 6: Setting up WordPress..."
-# Wait longer for WordPress to be fully initialized
+echo "Step 5: Waiting for WordPress to be ready..."
+# Wait for WordPress to be ready instead of requiring manual intervention
+MAX_ATTEMPTS=30
+ATTEMPT=1
 echo "Waiting for WordPress to be fully initialized..."
-sleep 15
+while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+  echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+  if docker-compose exec wordpress wp core is-installed --path=/var/www/html --allow-root 2>/dev/null; then
+    echo "✅ WordPress is ready! Continuing with setup..."
+    break
+  fi
+  ATTEMPT=$((ATTEMPT+1))
+  sleep 10
+  if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+    echo "⚠️ Timed out waiting for WordPress to be ready. Will continue anyway and try our best."
+  fi
+done
+
+# Ensure everything is really ready with an extra pause
+echo "Giving WordPress a moment to complete initialization..."
+sleep 20
 
 # Ensure BuddyPress components are activated with special focus on critical components
 echo "Activating BuddyPress components..."
@@ -115,36 +127,22 @@ echo "Removing default WordPress content..."
 # Remove default WordPress content with extra safety checks
 echo "Removing default Hello World post and Sample Page..."
 docker-compose exec wordpress bash -c "
-  # Find and delete Hello World post by title AND verify it's post ID 1
-  HELLO_POST=\$(wp post list --post_type=post --post_status=any --title='Hello world!' --fields=ID,title --format=json --path=/var/www/html 2>/dev/null)
-  if [ ! -z \"\$HELLO_POST\" ]; then
-    HELLO_ID=\$(echo \$HELLO_POST | grep -o '\"id\":[0-9]*' | grep -o '[0-9]*')
-    HELLO_TITLE=\$(echo \$HELLO_POST | grep -o '\"title\":\"Hello world!\"')
-    
-    # Only delete if BOTH title matches AND it's the default post (typically ID 1)
-    if [ ! -z \"\$HELLO_TITLE\" ] && [ \"\$HELLO_ID\" -eq 1 ]; then
-      wp post delete \$HELLO_ID --force --path=/var/www/html
-      echo '✅ Safely deleted default Hello World post (ID 1)'
-    else
-      echo '⚠️ Found a Hello World post but ID wasn\\'t 1. Not deleting for safety.'
-    fi
+  # Find and delete Hello World post using format=ids to get just the IDs
+  HELLO_POST_ID=\$(wp post list --post_type=post --post_status=any --title='Hello world!' --field=ID --format=ids --path=/var/www/html 2>/dev/null)
+  if [ ! -z \"\$HELLO_POST_ID\" ]; then
+    # Delete the Hello World post directly by ID
+    wp post delete \$HELLO_POST_ID --force --path=/var/www/html
+    echo \"✅ Deleted Hello World post (ID \$HELLO_POST_ID)\"
   else
     echo '✓ No Hello World post found (already deleted)'
   fi
 
-  # Find and delete Sample Page by title AND verify it's page ID 2
-  SAMPLE_PAGE=\$(wp post list --post_type=page --post_status=any --title='Sample Page' --fields=ID,title --format=json --path=/var/www/html 2>/dev/null)
-  if [ ! -z \"\$SAMPLE_PAGE\" ]; then
-    SAMPLE_ID=\$(echo \$SAMPLE_PAGE | grep -o '\"id\":[0-9]*' | grep -o '[0-9]*')
-    SAMPLE_TITLE=\$(echo \$SAMPLE_PAGE | grep -o '\"title\":\"Sample Page\"')
-    
-    # Only delete if BOTH title matches AND it's the default page (typically ID 2)
-    if [ ! -z \"\$SAMPLE_TITLE\" ] && [ \"\$SAMPLE_ID\" -eq 2 ]; then
-      wp post delete \$SAMPLE_ID --force --path=/var/www/html
-      echo '✅ Safely deleted default Sample Page (ID 2)'
-    else
-      echo '⚠️ Found a Sample Page but ID wasn\\'t 2. Not deleting for safety.'
-    fi
+  # Find and delete Sample Page using format=ids to get just the IDs
+  SAMPLE_PAGE_ID=\$(wp post list --post_type=page --post_status=any --title='Sample Page' --field=ID --format=ids --path=/var/www/html 2>/dev/null)
+  if [ ! -z \"\$SAMPLE_PAGE_ID\" ]; then
+    # Delete the Sample Page directly by ID
+    wp post delete \$SAMPLE_PAGE_ID --force --path=/var/www/html
+    echo \"✅ Deleted Sample Page (ID \$SAMPLE_PAGE_ID)\"
   else
     echo '✓ No Sample Page found (already deleted)'
   fi
@@ -167,7 +165,30 @@ docker-compose exec wordpress bash -c "
   wp eval 'global \$shortcode_tags; echo \"Shortcode status: \" . (isset(\$shortcode_tags[\"scripthammer_react_app\"]) ? \"✅ registered\" : \"❌ NOT registered\");' --path=/var/www/html && \
   
   # Force WordPress to load the plugin if not already loaded
-  wp eval 'if (!function_exists(\"render_scripthammer_react_placeholder\")) { include_once(\"/var/www/html/wp-content/mu-plugins/metronome-app.php\"); echo \"Metronome app loaded manually\"; }' --path=/var/www/html
+  wp eval 'if (!function_exists(\"render_scripthammer_react_placeholder\")) { include_once(\"/var/www/html/wp-content/mu-plugins/metronome-app.php\"); echo \"Metronome app loaded manually\"; }' --path=/var/www/html && \
+  
+  # We'll only use the ScriptHammer Drum Machine page created by the main setup instead of React Integration
+  REACT_PAGE=\$(wp post list --post_type=page --name=react-integration --field=ID --format=ids --path=/var/www/html 2>/dev/null)
+  if [ ! -z \"\$REACT_PAGE\" ]; then
+    echo \"Removing duplicate React Integration page...\"
+    wp post delete \$REACT_PAGE --force --path=/var/www/html && \
+    echo \"✅ Removed duplicate React Integration page\"
+  fi
+  
+  # Ensure we have the ScriptHammer Drum Machine page
+  DRUM_PAGE=\$(wp post list --post_type=page --name=band-metronome --field=ID --format=ids --path=/var/www/html 2>/dev/null)
+  if [ -z \"\$DRUM_PAGE\" ]; then
+    echo \"Creating ScriptHammer Drum Machine page...\"
+    # Using a heredoc to handle content with special characters properly
+    wp post create --post_type=page --post_title=\"ScriptHammer Drum Machine\" --post_status=\"publish\" --post_name=\"band-metronome\" --post_content=\"$(cat <<'CONTENT'
+<h2>ScriptHammer Drum Machine</h2>
+<div>[scripthammer_react_app]</div>
+CONTENT
+)\" --path=/var/www/html && \
+    echo \"✅ Created ScriptHammer Drum Machine page\"
+  else
+    echo \"ScriptHammer Drum Machine page already exists\"
+  fi
 "
 
 # Simple gamification has been removed
@@ -295,34 +316,43 @@ else
   echo "✅ Metronome shortcode is properly registered"
 fi
 
-# Verify the React Integration page exists and has the shortcode
-echo "Checking that the React Integration page contains the shortcode..."
-INTEGRATION_PAGE=$(docker-compose exec wordpress wp post list --post_type=page --post_status=publish --name=react-integration --format=count --path=/var/www/html 2>/dev/null)
+# Verify the ScriptHammer Drum Machine page exists and has the shortcode
+echo "Checking that the ScriptHammer Drum Machine page contains the shortcode..."
+DRUM_PAGE=$(docker-compose exec wordpress wp post list --post_type=page --post_status=publish --name=band-metronome --format=count --path=/var/www/html 2>/dev/null)
 
-if [ "$INTEGRATION_PAGE" -eq "0" ]; then
-  echo "React Integration page not found. Creating it..."
-  docker-compose exec wordpress wp post create --post_type=page --post_title="React Integration" --post_status="publish" --post_name="react-integration" --post_content="<h2>ScriptHammer React Integration</h2>
+if [ "$DRUM_PAGE" -eq "0" ]; then
+  echo "ScriptHammer Drum Machine page not found. Creating it..."
+  docker-compose exec wordpress wp post create --post_type=page --post_title="ScriptHammer Drum Machine" --post_status="publish" --post_name="band-metronome" --post_content="<h2>ScriptHammer Drum Machine</h2>
 <div>[scripthammer_react_app]</div>" --path=/var/www/html
-  echo "✅ Created React Integration page with shortcode"
+  echo "✅ Created ScriptHammer Drum Machine page with shortcode"
 else
   # Make sure the page has the shortcode
-  HAS_SHORTCODE=$(docker-compose exec wordpress wp --path=/var/www/html post get $(docker-compose exec wordpress wp --path=/var/www/html post list --post_type=page --name=react-integration --field=ID) --field=content | grep -c '\[scripthammer_react_app\]')
+  HAS_SHORTCODE=$(docker-compose exec wordpress wp --path=/var/www/html post get $(docker-compose exec wordpress wp --path=/var/www/html post list --post_type=page --name=band-metronome --field=ID) --field=content | grep -c '\[scripthammer_react_app\]')
   
   if [ "$HAS_SHORTCODE" -eq "0" ]; then
-    echo "⚠️ React Integration page exists but doesn't contain the shortcode. Adding it..."
-    INTEGRATION_ID=$(docker-compose exec wordpress wp --path=/var/www/html post list --post_type=page --name=react-integration --field=ID)
-    docker-compose exec wordpress wp --path=/var/www/html post update $INTEGRATION_ID --post_content="<h2>ScriptHammer React Integration</h2>
+    echo "⚠️ ScriptHammer Drum Machine page exists but doesn't contain the shortcode. Adding it..."
+    DRUM_ID=$(docker-compose exec wordpress wp --path=/var/www/html post list --post_type=page --name=band-metronome --field=ID)
+    docker-compose exec wordpress wp --path=/var/www/html post update $DRUM_ID --post_content="<h2>ScriptHammer Drum Machine</h2>
 <div>[scripthammer_react_app]</div>"
-    echo "✅ Added shortcode to React Integration page"
+    echo "✅ Added shortcode to ScriptHammer Drum Machine page"
   else
-    echo "✅ React Integration page exists and contains the shortcode"
+    echo "✅ ScriptHammer Drum Machine page exists and contains the shortcode"
   fi
+fi
+
+# Remove any existing React Integration page (redundant)
+REACT_PAGE=$(docker-compose exec wordpress wp post list --post_type=page --post_status=publish --name=react-integration --format=count --path=/var/www/html 2>/dev/null)
+if [ "$REACT_PAGE" -gt "0" ]; then
+  echo "Found duplicate React Integration page. Removing it..."
+  REACT_ID=$(docker-compose exec wordpress wp --path=/var/www/html post list --post_type=page --name=react-integration --field=ID)
+  docker-compose exec wordpress wp --path=/var/www/html post delete $REACT_ID --force
+  echo "✅ Removed duplicate React Integration page"
 fi
 
 # Final verification - check if the shortcode is being rendered properly
 echo "Performing final verification - checking if the shortcode renders..."
 # The app should contain this distinctive metronome-app class
-RENDERED_CHECK=$(docker-compose exec wordpress curl -s http://localhost/react-integration | grep -c "metronome-app")
+RENDERED_CHECK=$(docker-compose exec wordpress curl -s http://localhost/band-metronome | grep -c "metronome-app")
 
 if [ "$RENDERED_CHECK" -gt "0" ]; then
   echo "✅ SUCCESS: Metronome app is rendering correctly on the page!"
@@ -335,7 +365,7 @@ else
   
   # Try again after a brief delay
   sleep 2
-  RENDERED_CHECK_RETRY=$(docker-compose exec wordpress curl -s http://localhost/react-integration | grep -c "metronome-app")
+  RENDERED_CHECK_RETRY=$(docker-compose exec wordpress curl -s http://localhost/band-metronome | grep -c "metronome-app")
   
   if [ "$RENDERED_CHECK_RETRY" -gt "0" ]; then
     echo "✅ SUCCESS on retry: Metronome app is now rendering correctly!"
@@ -394,6 +424,6 @@ echo "Access WordPress at: $WP_SITE_URL"
 echo "Admin user: ${WP_ADMIN_USER:-admin}"
 echo "Admin password: $WP_ADMIN_PASSWORD"
 echo ""
-echo "React Integration page is available at: $WP_SITE_URL/react-integration"
-echo "It should now show the ReactPress placeholder."
+echo "ScriptHammer Drum Machine is available at: $WP_SITE_URL/band-metronome"
+echo "It should now show the metronome app."
 echo ""

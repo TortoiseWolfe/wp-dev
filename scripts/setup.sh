@@ -324,6 +324,15 @@ if [ -x /usr/local/bin/devscripts/scripthammer.sh ]; then
   # Ensure script is executable
   chmod +x /usr/local/bin/devscripts/scripthammer.sh
   
+  # Ensure exports directory exists and is accessible
+  mkdir -p /var/www/html/wp-content/exports
+  
+  # Check if export files need to be copied from devscripts
+  if [ ! -f "/var/www/html/wp-content/exports/all-band-content-000.xml" ] && [ -f "/usr/local/bin/devscripts/exports/all-band-content-000.xml" ]; then
+    echo "Copying export files from devscripts directory..."
+    cp /usr/local/bin/devscripts/exports/*.xml /var/www/html/wp-content/exports/ 2>/dev/null || true
+  fi
+  
   # Run the script with metronome flag if enabled
   if [[ "${CREATE_BAND_METRONOME:-true}" == "true" ]]; then
     /usr/local/bin/devscripts/scripthammer.sh --with-metronome

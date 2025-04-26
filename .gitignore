@@ -27,6 +27,7 @@ Thumbs.db
 # Exclude Node.js dependencies (if developing themes or plugins that require Node)
 node_modules/
 bower_components/
+package-lock.json
 
 # Exclude Composer dependencies (if installed locally and not needed in the repository)
 vendor/

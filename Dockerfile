@@ -56,6 +56,8 @@ COPY devscripts/metronome-app.php /usr/local/bin/devscripts/metronome-app.php
 COPY devscripts/metronome-app /usr/local/bin/devscripts/metronome-app
 # Copy assets for band member avatars
 COPY devscripts/assets /usr/local/bin/devscripts/assets
+# Copy exports for content import
+COPY exports /usr/local/bin/devscripts/exports
 RUN chmod +x /usr/local/bin/devscripts/demo-content.sh /usr/local/bin/devscripts/scripthammer.sh
 
 # Fix BuddyX theme categories template to show all categories

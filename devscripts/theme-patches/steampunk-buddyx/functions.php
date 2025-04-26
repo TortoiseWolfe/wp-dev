@@ -3,6 +3,53 @@
  * Steampunk BuddyX child theme functions
  */
 
+// Force background colors through inline CSS (most reliable method)
+function steampunk_buddyx_add_custom_background() {
+    echo '<style>
+        /* Main backgrounds with darker sepia tone */
+        html, body, #page, .site, #content, #primary, .buddyx-content, main#main, 
+        .entry-wrapper, .entry-content-wrapper, .entry-content,
+        .buddyx-article, .site-wrapper-frame, .section-title, .white-section, .single article,
+        .buddyx-posts-list, .buddyx-posts-list__item, .container-fluid, .site-footer, .buddyx-header {
+            background-color: #e6dbc9 !important; /* Darker sepia tone */
+        }
+        
+        /* UI elements with slightly darker color */
+        .site-header, 
+        .site-branding, 
+        .site-branding-inner,
+        .site-logo-wrapper, 
+        nav, .navigation, .navbar, 
+        .site-info, 
+        .footer-widget, .footer-wrap,
+        .buddyx-search-results, 
+        .popup-content, 
+        .card-header, .card-footer, 
+        .panel {
+            background-color: #d9cdb9 !important; /* Slightly darker for UI elements */
+            opacity: 1 !important;
+        }
+        
+        /* Fix for the header vertical white bars */
+        .site-header-wrapper {
+            background-color: #d9cdb9 !important;
+            box-shadow: 0 1px 0 0 rgba(206, 206, 206, 0.05), 0 5px 10px 0 rgba(132, 132, 132, 0.15) !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            position: relative !important;
+        }
+        
+        /* Fix for any potential interior elements */
+        .site-header-wrapper .container {
+            background-color: #d9cdb9 !important;
+        }
+    </style>';
+}
+add_action('wp_head', 'steampunk_buddyx_add_custom_background', 999999);
+
 // Modify featured image behavior, but don't completely disable 
 function steampunk_buddyx_modify_thumbnail_support() {
     // Don't remove support completely since we need thumbnails on home/archive

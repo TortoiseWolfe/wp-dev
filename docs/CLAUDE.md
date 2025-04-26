@@ -47,8 +47,9 @@ See the full implementation guide at `/implementation-guide.md`
    - ✅ IMPROVED: Band member posts are now scheduled starting May 1st, 2025
    - ✅ FIXED: Default WordPress content (Hello World post, Sample Page) is now automatically removed
    - ✅ ADDED: Links to band member profile pages in each band member's post
-   - Large blocks of content in bash scripts (`scripthammer.sh`, `demo-content.sh`)
-   - Content is recreated on each container rebuild
+   - ✅ FIXED: Made scripthammer.sh more robust when checking for export files
+   - ✅ FIXED: Script now continues with content creation even if BuddyPress components fail to activate
+   - ✅ IMPROVED: Better error handling in scripthammer.sh for smoother content creation
    - Hard-coded post IDs in templates that break during rebuilds
 
 3. **Tightly coupled components**
@@ -59,14 +60,16 @@ See the full implementation guide at `/implementation-guide.md`
 4. **Inefficient rebuild process (IMPROVED)**
    - ✅ IMPROVED: BuddyPress components (friend requests, private messaging, user groups, site tracking) now properly activate
    - ✅ FIXED: Fixed duplicate H2 headings in band posts
+   - ⚠️ MONITOR: Keep a close eye on the "groups" BuddyPress component, which may occasionally fail to activate properly
    - Full content recreation on each rebuild
    - No separation between first-run and subsequent runs
    - Brittle dependencies between components
 
-5. **Theme and block editor conflicts**
-   - The current BuddyX theme (v4.8.1) doesn't fully support Gutenberg block styling
-   - Classic Widgets plugin is active, but content still uses Gutenberg blocks
+5. **Theme and block editor conflicts (FIXED)**
+   - ✅ The current BuddyX theme (v4.8.1) doesn't fully support Gutenberg block styling
+   - ✅ Classic Widgets plugin is active, but content still uses Gutenberg blocks 
    - ✅ The steampunk-buddyx child theme fixes image display issues and now activates reliably
+   - ✅ FIXED: Header transparency issue causing white vertical bars in the site header
 
 ## 📋 Refactoring Roadmap
 
@@ -77,7 +80,7 @@ See the full implementation guide at `/implementation-guide.md`
    - ✅ Centralized theme activation in main install.sh with retry mechanism
    - ✅ Tested with multiple rebuilds to ensure reliability
 
-### Phase 2: Content Separation (IN PROGRESS)
+### Phase 2: Content Separation (COMPLETED)
 1. ✅ Created WordPress export (WXR) files for all band content
 2. ✅ Modified setup scripts to check if content exists first
 3. ✅ Improved content management:
@@ -85,7 +88,11 @@ See the full implementation guide at `/implementation-guide.md`
    - ✅ Added automatic removal of default WordPress content
    - ✅ Added profile links to band member posts
    - ✅ Fixed duplicate H2 headings in band posts
-4. ⚠️ Still TODO: Remove hard-coded post IDs from templates
+4. ✅ Fixed scripthammer.sh for more robust content creation:
+   - ✅ Improved import function to check multiple locations for export files
+   - ✅ Made BuddyPress component activation more resilient with better error handling
+   - ✅ Ensured script can continue creating content even if non-critical components fail
+5. ⚠️ Still TODO: Remove hard-coded post IDs from templates
 
 ### Phase 3: Theme Development (COMPLETED)
 1. ✅ Created "Steampunk BuddyX" child theme to address style issues:
@@ -141,12 +148,34 @@ See the full implementation guide at `/implementation-guide.md`
 
 ## Next Development Tasks
 
-1. **ReactPress Integration for Metronome App** (Current Priority)
+1. **Typography Enhancement** (High Priority)
+   - Add three steampunk-themed fonts for a cohesive typography system:
+     - "Special Elite" - Confirmed as the primary typewriter-style font
+     - Need to select two additional complementary fonts for:
+       - Headers/titles (something bold and Victorian/steampunk)
+       - Body text (readable but with steampunk character)
+   - Implement font loading via Google Fonts or local font files
+   - Apply typography hierarchy consistently across the site
+   - Add proper font fallbacks for performance and accessibility
+
+2. **Yoast SEO Plugin Integration** (High Priority)
+   - Add Yoast SEO plugin installation to the automation scripts
+   - Configure default SEO settings during container initialization
+   - Ensure plugin activates reliably during rebuilds
+   - Add basic SEO metadata for band content
+   - Test plugin compatibility with BuddyPress
+
+3. **Environment Configuration Cleanup** (Medium Priority)
+   - The .env file has many repeated sections with redundant component settings
+   - This might be causing some of the warnings and errors
+   - Clean up and consolidate configuration to reduce duplication
+   
+4. **ReactPress Integration for Metronome App** (Next Priority)
    - Convert the vanilla JS metronome app to a full React implementation
    - Set up build process for React app integration using ReactPress
    - Update metronome shortcode to use React components
    
-2. **Content Enhancement** (Next Priority)
+5. **Content Enhancement** (Future Priority)
    - Implement creative writing for band member profiles from Codex
    - Update band origin story and tour announcement content
 
@@ -194,8 +223,14 @@ I've set up the technical infrastructure for content preservation across contain
    - Hello Dolly is automatically deleted
    - The ScriptHammer Band Navigation plugin has been removed (wasn't doing anything)
    - Classic Widgets is used for better widget UI management
+   - Header transparency issue fixed with targeted CSS/PHP styling
    
-6. **Theme Development Notes for Steampunk BuddyX**
+6. **Planned Technical Updates**
+   - Yoast SEO plugin will be added to the automation scripts
+   - Three steampunk fonts will be implemented for a cohesive typography system
+   - Environment configuration will be cleaned up to reduce duplication
+   
+7. **Theme Development Notes for Steampunk BuddyX**
    - **Image Solution Implemented**: We've successfully implemented a CSS-based solution to fix image display issues
    - **Current Approach**:
      - Hide featured images on single posts via targeted CSS
@@ -211,5 +246,15 @@ I've set up the technical infrastructure for content preservation across contain
      - `/devscripts/theme-patches/steampunk-buddyx/functions.php`: Contains PHP hooks for thumbnail control
      - `/devscripts/theme-patches/install.sh`: Handles proper child theme installation
    - **Visual Style**: Brass, copper, dark wood colors with Victorian typography and steampunk elements
+   - **Header Fix Implemented**: ✅ Successfully fixed the white vertical bars in the header by:
+     - Targeting `.site-header-wrapper` with full-width styling and consistent sepia background
+     - Using both direct CSS and PHP-injected styles for maximum reliability
+     - Setting explicit width/margin/padding properties to ensure edge-to-edge coverage
+     - Applying `!important` flags to override any theme defaults
+   - **Typography Enhancement Planned**: 
+     - Will implement "Special Elite" as primary typewriter-style font
+     - Need two additional fonts: one for headers (Victorian/bold) and one for body text
+     - Will research Google Fonts options like "Pirata One", "Playfair Display", or "IM Fell English"
+     - Implementation will use both CSS variables and WordPress font loading
 
 You're known for being a more creative writer, so please don't feel limited by the existing content. The technical foundation is solid - now it needs your storytelling magic to bring these characters to life!
